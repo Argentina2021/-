@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <title>气泡交互展示</title>
+  <link rel="stylesheet" href="fonts/misans-vf.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: "MiSans VF", "MiSans", sans-serif;
+    }
+
+    #app {
+      transform-origin: center center;
+    }
+
+    #viewport {
+      position: relative;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      touch-action: none;
+      background: #000;
+    }
+
+    #bg-video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 0;
+      pointer-events: none;
+      background: #000;
+    }
+
+    #canvas {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      display: block;
+      width: 1920px;
+      height: 1080px;
+      cursor: grab;
+      background: transparent;
+      mix-blend-mode: plus-lighter;
+    }
+
+    #canvas.grabbing {
+      cursor: grabbing;
+    }
+
+    #canvas.pointer {
+      cursor: pointer;
+    }
+
+    /* 滑动提示 */
+    #scroll-hint {
+      position: absolute;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: "MiSans VF", "MiSans", sans-serif;
+      font-size: 14px;
+      color: rgba(180, 230, 255, 0.45);
+      pointer-events: none;
+      z-index: 5;
+      transition: opacity 0.4s;
+    }
+
+    #scroll-hint.hidden {
+      opacity: 0;
+    }
+
+    #scroll-dots {
+      display: flex;
+      gap: 8px;
+    }
+
+    .scroll-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(180, 230, 255, 0.25);
+      transition: background 0.3s, transform 0.3s;
+    }
+
+    .scroll-dot.active {
+      background: rgba(180, 230, 255, 0.75);
+      transform: scale(1.25);
+    }
+
+    /* 卡片遮罩 */
+    #overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.35s ease;
+      z-index: 10;
+    }
+
+    #overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* 内容卡片 */
+    #card {
+      width: 560px;
+      min-height: 360px;
+      background: rgba(255, 255, 255, 0.96);
+      border-radius: 20px;
+      box-shadow:
+        0 24px 80px rgba(0, 0, 0, 0.45),
+        0 0 0 1px rgba(255, 255, 255, 0.15);
+      padding: 40px 48px;
+      transform: scale(0.88) translateY(20px);
+      transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+      position: relative;
+    }
+
+    #overlay.active #card {
+      transform: scale(1) translateY(0);
+    }
+
+    #card-close {
+      position: absolute;
+      top: 18px;
+      right: 22px;
+      width: 36px;
+      height: 36px;
+      border: none;
+      background: rgba(0, 0, 0, 0.06);
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 20px;
+      line-height: 1;
+      color: #666;
+      transition: background 0.2s;
+    }
+
+    #card-close:hover {
+      background: rgba(0, 0, 0, 0.12);
+      color: #333;
+    }
+
+    #card-title {
+      font-family: "MiSans VF", "MiSans", sans-serif;
+      font-size: 22px;
+      font-weight: 600;
+      color: #1a1a1a;
+      margin-bottom: 16px;
+    }
+
+    #card-body {
+      font-family: "MiSans VF", "MiSans", sans-serif;
+      font-size: 16px;
+      line-height: 1.7;
+      color: #555;
+      min-height: 200px;
+    }
+
+    #card-body.placeholder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px dashed rgba(0, 0, 0, 0.08);
+      border-radius: 12px;
+      color: #aaa;
+      font-size: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="viewport">
+      <video id="bg-video" autoplay muted loop playsinline preload="auto"></video>
+      <canvas id="canvas"></canvas>
+      <div id="scroll-hint">
+        <span>← 左右滑动浏览更多 →</span>
+        <div id="scroll-dots"></div>
+      </div>
+      <div id="overlay">
+        <div id="card">
+          <button id="card-close" aria-label="关闭">×</button>
+          <div id="card-title">内容卡片</div>
+          <div id="card-body" class="placeholder">此处放置展示内容</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="companies.js"></script>
+  <script>
+    const VIEW_W = 1920;
+    const H = 1080;
+    const BUBBLE_COUNT = COMPANIES.length;
+    const BUBBLES_PER_VIEW = 30;
+    const PANEL_COUNT = Math.ceil(BUBBLE_COUNT / BUBBLES_PER_VIEW);
+    const WORLD_W = VIEW_W * PANEL_COUNT;
+    const FONT_FAMILY = '"MiSans VF", "MiSans", sans-serif';
+    let fontsReady = false;
+    let labelsPrepared = false;
+
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d', { alpha: true });
+    const overlay = document.getElementById('overlay');
+    const cardTitle = document.getElementById('card-title');
+    const cardBody = document.getElementById('card-body');
+    const cardClose = document.getElementById('card-close');
+    const app = document.getElementById('app');
+    const viewport = document.getElementById('viewport');
+    const scrollHint = document.getElementById('scroll-hint');
+    const scrollDots = document.getElementById('scroll-dots');
+
+    canvas.width = VIEW_W;
+    canvas.height = H;
+
+    let viewScale = 1;
+    let scrollX = 0;
+    const maxScroll = WORLD_W - VIEW_W;
+
+    function fitStage() {
+      viewScale = Math.min(window.innerWidth / VIEW_W, window.innerHeight / H);
+      app.style.transform = `scale(${viewScale})`;
+    }
+    window.addEventListener('resize', fitStage);
+    fitStage();
+
+    // 根据企业列表生成气泡配置
+    function generateBubbleConfigs() {
+      const configs = [];
+      for (let i = 0; i < BUBBLE_COUNT; i++) {
+        const panel = Math.floor(i / BUBBLES_PER_VIEW);
+        const idxInPanel = i % BUBBLES_PER_VIEW;
+        const countInPanel = Math.min(BUBBLES_PER_VIEW, BUBBLE_COUNT - panel * BUBBLES_PER_VIEW);
+        const cols = 6;
+        const rows = Math.ceil(countInPanel / cols);
+        const col = idxInPanel % cols;
+        const row = Math.floor(idxInPanel / cols);
+        const jitterX = Math.sin(i * 2.399) * 0.05;
+        const jitterY = Math.cos(i * 1.713) * 0.05;
+        const lx = (col + 0.5) / cols + jitterX;
+        const ly = (row + 0.5) / rows + jitterY;
+        const marginX = 0.05;
+        const marginY = 0.05;
+        const absX = panel * VIEW_W + marginX * VIEW_W + lx * VIEW_W * (1 - 2 * marginX);
+        const absY = marginY * H + ly * H * (1 - 2 * marginY);
+        const company = COMPANIES[i];
+        configs.push({
+          x: absX / WORLD_W,
+          y: absY / H,
+          title: company.name,
+          content: company.products.map(p => p.name).join('、'),
+          products: company.products,
+        });
+      }
+      return configs;
+    }
+
+    // 气泡半径：统一尺寸 ×0.8
+    const BUBBLE_SIZE_SCALE = 0.8;
+    const AVG_R = Math.round(92 * BUBBLE_SIZE_SCALE);
+    const R_SPREAD = 0;
+
+    const BUBBLE_CONFIGS = generateBubbleConfigs();
+
+    // 空中漂浮物理常量
+    const GRAVITY = 0.000020;
+    const BUOYANCY = GRAVITY; // 浮力 = 重力，垂直净力为零
+    const AIR_DRAG = 0.016;
+    const MAX_SPEED = 0.48;
+
+    function bubbleParallax(b) {
+      return 0.82 + b.z * 0.18;
+    }
+
+    function getAirForce(b, time) {
+      const t = time * 0.001;
+      const influence = 0.28 + b.z * 0.72;
+
+      const globalX = Math.sin(t * 0.11 + 0.4) * 0.006
+        + Math.sin(t * 0.063 + 1.8) * 0.004
+        + Math.sin(t * 0.028 + 2.6) * 0.003;
+      const globalY = Math.cos(t * 0.085 + 0.9) * 0.003
+        + Math.sin(t * 0.051 + 3.1) * 0.002;
+
+      const localX = Math.sin(t * b.swayFreq1 + b.swayPhase1) * 0.011
+        + Math.sin(t * b.swayFreq2 + b.swayPhase2) * 0.007
+        + Math.sin(t * 0.27 + b.swayPhase3) * 0.004;
+      const localY = Math.cos(t * b.swayFreq1 * 0.87 + b.swayPhase2) * 0.009
+        + Math.cos(t * b.swayFreq2 * 1.25 + b.swayPhase1) * 0.005;
+
+      const gust = Math.sin(t * 0.042 + b.gustPhase) * Math.cos(t * 0.029 + b.gustPhase * 1.7);
+
+      return {
+        fx: (globalX + localX + gust * 0.005) * influence,
+        fy: (globalY + localY + gust * 0.003) * influence,
+      };
+    }
+
+    class Bubble {
+      constructor(cfg, index) {
+        this.baseR = AVG_R + (Math.random() - 0.5) * R_SPREAD * 2;
+        this.r = this.baseR;
+        this.x = cfg.x * WORLD_W;
+        this.y = cfg.y * H;
+        // 空间纵深：0 远 1 近
+        this.z = 0.12 + Math.random() * 0.88;
+        this.depthScale = 0.68 + this.z * 0.42;
+        this.depthAlpha = 0.38 + this.z * 0.62;
+
+        this.vx = (Math.random() - 0.5) * 0.08;
+        this.vy = (Math.random() - 0.5) * 0.06;
+        this.mass = this.baseR * this.baseR * (0.7 + this.z * 0.3);
+
+        this.title = cfg.title || `企业 ${index + 1}`;
+        this.content = cfg.content || '';
+        this.products = cfg.products || [];
+
+        this.swayPhase1 = Math.random() * Math.PI * 2;
+        this.swayPhase2 = Math.random() * Math.PI * 2;
+        this.swayPhase3 = Math.random() * Math.PI * 2;
+        this.gustPhase = Math.random() * Math.PI * 2;
+        this.swayFreq1 = 0.12 + Math.random() * 0.22;
+        this.swayFreq2 = 0.06 + Math.random() * 0.14;
+        this.swayX = 0;
+        this.swayY = 0;
+        this.wobblePhase = Math.random() * Math.PI * 2;
+
+        this.breathPhase = Math.random() * Math.PI * 2;
+        this.breathSpeed = 0.35 + Math.random() * 0.28;
+        this.breathAmp = 0.04 + Math.random() * 0.08;
+        this.sizeScale = 1;
+        this.hoverScale = 1;
+        this.targetHoverScale = 1;
+        this.labelLayout = null;
+      }
+
+      update(time, dt) {
+        const t = time * 0.001;
+        const air = getAirForce(this, time);
+        const vol = this.baseR * this.baseR;
+
+        // 浮力 = 重力，无持续上浮/下沉
+        const lift = (BUOYANCY * vol - GRAVITY * vol) * dt;
+        const drag = AIR_DRAG * (0.85 + (1 - this.z) * 0.25);
+
+        const ax = air.fx - this.vx * drag;
+        const ay = air.fy + lift - this.vy * drag;
+
+        this.vx += ax * dt;
+        this.vy += ay * dt;
+
+        const maxSpeed = MAX_SPEED * (0.75 + this.z * 0.35);
+        const speed = Math.hypot(this.vx, this.vy);
+        if (speed > maxSpeed) {
+          this.vx = (this.vx / speed) * maxSpeed;
+          this.vy = (this.vy / speed) * maxSpeed;
+        }
+
+        // 飘忽晃动 — 叠加在物理位移上的轻柔摆动
+        this.swayX = Math.sin(t * this.swayFreq1 + this.swayPhase1) * (3 + this.z * 4)
+          + Math.sin(t * this.swayFreq2 * 1.6 + this.swayPhase3) * (1.5 + this.z * 2);
+        this.swayY = Math.cos(t * this.swayFreq2 + this.swayPhase2) * (2.5 + this.z * 3)
+          + Math.cos(t * this.swayFreq1 * 0.7 + this.swayPhase1) * (1.2 + this.z * 1.8);
+
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+
+        // 呼吸起伏
+        this.sizeScale = 1
+          + Math.sin(t * this.breathSpeed + this.breathPhase) * this.breathAmp
+          + Math.sin(t * this.breathSpeed * 0.55 + this.breathPhase * 1.7) * this.breathAmp * 0.3;
+        this.hoverScale += (this.targetHoverScale - this.hoverScale) * 0.08;
+        this.r = this.baseR * this.sizeScale * this.hoverScale * this.depthScale;
+        this.mass = this.baseR * this.baseR * (0.7 + this.z * 0.3);
+
+        // 软边界 — 轻柔回弹，不弹飞
+        const pad = this.r + 4;
+        const soft = 0.012 * dt;
+        if (this.x < pad) { this.x += (pad - this.x) * 0.06; this.vx = Math.abs(this.vx) * 0.08 + soft; }
+        if (this.x + pad > WORLD_W) { this.x -= (this.x + pad - WORLD_W) * 0.06; this.vx = -Math.abs(this.vx) * 0.08 - soft; }
+        if (this.y < pad) { this.y += (pad - this.y) * 0.06; this.vy = Math.abs(this.vy) * 0.08 + soft * 0.5; }
+        if (this.y + pad > H) { this.y -= (this.y + pad - H) * 0.06; this.vy = -Math.abs(this.vy) * 0.08 - soft * 0.5; }
+      }
+
+      drawX(scroll) {
+        return this.x + scroll * (1 - bubbleParallax(this));
+      }
+
+      contains(worldX, worldY, scroll) {
+        const cx = this.drawX(scroll) + this.swayX;
+        const cy = this.y + this.swayY;
+        const dx = worldX - cx;
+        const dy = worldY - cy;
+        // 远处气泡略扩大点击区域，避免太小点不中
+        const hitR = this.r * (1.04 + (1 - this.z) * 0.1);
+        return dx * dx + dy * dy <= hitR * hitR;
+      }
+    }
+
+    // 圆-圆碰撞
+    function resolveCollision(a, b) {
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const dist = Math.hypot(dx, dy);
+      const minDist = a.r + b.r;
+
+      if (dist === 0 || dist >= minDist) return;
+
+      const nx = dx / dist;
+      const ny = dy / dist;
+      const overlap = minDist - dist;
+
+      const totalMass = a.mass + b.mass;
+      a.x -= nx * overlap * (b.mass / totalMass);
+      a.y -= ny * overlap * (b.mass / totalMass);
+      b.x += nx * overlap * (a.mass / totalMass);
+      b.y += ny * overlap * (a.mass / totalMass);
+
+      const dvx = a.vx - b.vx;
+      const dvy = a.vy - b.vy;
+      const dvn = dvx * nx + dvy * ny;
+
+      if (dvn > 0) return;
+
+      const restitution = 0.22;
+      const impulse = (-(1 + restitution) * dvn) / (1 / a.mass + 1 / b.mass);
+
+      a.vx -= (impulse / a.mass) * nx * 0.65;
+      a.vy -= (impulse / a.mass) * ny * 0.65;
+      b.vx += (impulse / b.mass) * nx * 0.65;
+      b.vy += (impulse / b.mass) * ny * 0.65;
+    }
+
+    const bubbles = BUBBLE_CONFIGS.map((cfg, i) => new Bubble(cfg, i));
+    let hoveredBubble = null;
+    let activeBubble = null;
+
+    // 气泡内企业名称换行
+    function wrapTextLines(ctx, text, maxWidth) {
+      const chars = [...text];
+      const lines = [];
+      let line = '';
+      for (const ch of chars) {
+        const test = line + ch;
+        if (ctx.measureText(test).width > maxWidth && line) {
+          lines.push(line);
+          line = ch;
+        } else {
+          line = test;
+        }
+      }
+      if (line) lines.push(line);
+      return lines;
+    }
+
+    function computeLabelLayout(bubble) {
+      const r = bubble.baseR;
+      const maxWidth = r * 1.45;
+      let fontSize = Math.min(r * 0.19, 17);
+      let lines = [];
+      for (let i = 0; i < 8; i++) {
+        ctx.font = `520 ${fontSize}px ${FONT_FAMILY}`;
+        lines = wrapTextLines(ctx, bubble.title, maxWidth);
+        if (lines.length <= 4) break;
+        fontSize -= 1;
+      }
+      bubble.labelLayout = {
+        lines,
+        fontSize,
+        lineHeight: fontSize * 1.22,
+      };
+    }
+
+    function prepareAllLabelLayouts() {
+      if (!fontsReady || labelsPrepared) return;
+      for (const b of bubbles) computeLabelLayout(b);
+      labelsPrepared = true;
+    }
+
+    function drawBubbleLabel(ctx, bubble) {
+      if (!bubble.title || !fontsReady) return;
+      if (!bubble.labelLayout) computeLabelLayout(bubble);
+
+      const { lines, fontSize, lineHeight } = bubble.labelLayout;
+      const breathScale = bubble.r / bubble.baseR;
+
+      ctx.save();
+      ctx.scale(breathScale, breathScale);
+
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.93)';
+      ctx.shadowColor = 'rgba(0, 40, 80, 0.35)';
+      ctx.shadowBlur = 4 / breathScale;
+      ctx.font = `520 ${fontSize}px ${FONT_FAMILY}`;
+
+      const totalH = lines.length * lineHeight;
+      let y = -totalH / 2 + lineHeight / 2;
+      for (const ln of lines) {
+        ctx.fillText(ln, 0, y);
+        y += lineHeight;
+      }
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    }
+
+    // 绘制单个气泡 — 半透明 3D，带纵深虚实
+    function drawBubble(b, time, scroll) {
+      const t = time * 0.001;
+      const r = b.r;
+      const wobble = 1 + Math.sin(t * 1.1 + b.wobblePhase) * 0.006;
+      const dx = b.drawX(scroll) + b.swayX;
+      const dy = b.y + b.swayY;
+      const depthBlur = (1 - b.z) * 2.5;
+
+      ctx.save();
+      ctx.globalAlpha = b.depthAlpha;
+      ctx.translate(dx, dy);
+      ctx.scale(wobble, 1 / wobble * (1 + (wobble - 1) * 0.25));
+
+      // 远处气泡略虚
+      if (depthBlur > 0.3) {
+        ctx.shadowColor = 'rgba(120, 210, 255, 0.15)';
+        ctx.shadowBlur = depthBlur;
+      }
+
+      // 外层光晕
+      const outerGlow = ctx.createRadialGradient(0, 0, r * 0.6, 0, 0, r * 1.8);
+      outerGlow.addColorStop(0, `rgba(100, 200, 255, ${0.05 + b.z * 0.03})`);
+      outerGlow.addColorStop(0.5, 'rgba(80, 180, 240, 0.03)');
+      outerGlow.addColorStop(1, 'rgba(60, 160, 220, 0)');
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 1.8, 0, Math.PI * 2);
+      ctx.fillStyle = outerGlow;
+      ctx.fill();
+
+      // 主体 — 深色中心 + 边缘透光
+      const body = ctx.createRadialGradient(-r * 0.15, -r * 0.2, r * 0.05, 0, 0, r);
+      body.addColorStop(0, 'rgba(5, 15, 25, 0.15)');
+      body.addColorStop(0.35, 'rgba(10, 30, 50, 0.08)');
+      body.addColorStop(0.65, 'rgba(60, 180, 230, 0.12)');
+      body.addColorStop(0.85, 'rgba(120, 210, 255, 0.35)');
+      body.addColorStop(0.95, 'rgba(180, 235, 255, 0.55)');
+      body.addColorStop(1, 'rgba(200, 245, 255, 0.7)');
+
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fillStyle = body;
+      ctx.fill();
+
+      // 边缘 rim light
+      ctx.beginPath();
+      ctx.arc(0, 0, r - 1, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(160, 230, 255, 0.45)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // 顶部高光弧
+      ctx.beginPath();
+      ctx.ellipse(-r * 0.22, -r * 0.32, r * 0.35, r * 0.18, -0.4, 0, Math.PI * 2);
+      const highlight = ctx.createRadialGradient(-r * 0.22, -r * 0.32, 0, -r * 0.22, -r * 0.32, r * 0.4);
+      highlight.addColorStop(0, 'rgba(255, 255, 255, 0.55)');
+      highlight.addColorStop(0.4, 'rgba(200, 240, 255, 0.2)');
+      highlight.addColorStop(1, 'rgba(200, 240, 255, 0)');
+      ctx.fillStyle = highlight;
+      ctx.fill();
+
+      // 小 specular 点
+      ctx.beginPath();
+      ctx.arc(-r * 0.28, -r * 0.38, r * 0.07, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+      ctx.fill();
+
+      // 底部反射弧
+      ctx.beginPath();
+      ctx.ellipse(r * 0.1, r * 0.38, r * 0.28, r * 0.1, 0.2, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(100, 200, 255, 0.12)';
+      ctx.fill();
+
+      // hover 时增强边缘
+      if (b.targetHoverScale > 1) {
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(180, 240, 255, 0.6)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      drawBubbleLabel(ctx, b);
+
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    }
+
+    function render(time) {
+      ctx.clearRect(0, 0, VIEW_W, H);
+
+      ctx.save();
+      ctx.translate(-scrollX, 0);
+
+      // 远 → 近 绘制，近处气泡在上层
+      const sorted = [...bubbles].sort((a, b) => a.z - b.z || a.r - b.r);
+      for (const b of sorted) {
+        const drawX = b.drawX(scrollX);
+        if (drawX + b.r < scrollX - 30 || drawX - b.r > scrollX + VIEW_W + 30) continue;
+        drawBubble(b, time, scrollX);
+      }
+
+      ctx.restore();
+    }
+
+    function physicsStep(time, dt) {
+      for (const b of bubbles) b.update(time, dt);
+
+      for (let i = 0; i < bubbles.length; i++) {
+        for (let j = i + 1; j < bubbles.length; j++) {
+          resolveCollision(bubbles[i], bubbles[j]);
+        }
+      }
+    }
+
+    const bgVideo = document.getElementById('bg-video');
+    bgVideo.src = 'bg.mp4';
+    function startBgVideo() {
+      const p = bgVideo.play();
+      if (p && p.catch) {
+        p.catch(() => {
+          document.addEventListener('pointerdown', () => bgVideo.play(), { once: true });
+        });
+      }
+    }
+    bgVideo.addEventListener('loadeddata', startBgVideo);
+    bgVideo.addEventListener('canplay', startBgVideo);
+    bgVideo.addEventListener('error', () => {
+      console.error('背景视频加载失败:', bgVideo.error, bgVideo.currentSrc);
+    });
+    bgVideo.load();
+    startBgVideo();
+
+    document.fonts.load('500 16px "MiSans VF"').then(() => {
+      fontsReady = true;
+      prepareAllLabelLayouts();
+    });
+    document.fonts.ready.then(() => {
+      fontsReady = true;
+      prepareAllLabelLayouts();
+    });
+
+    let lastTime = 0;
+    function loop(time) {
+      const dt = lastTime ? Math.min((time - lastTime) / 16.667, 2.5) : 1;
+      physicsStep(time, dt);
+      render(time);
+      lastTime = time;
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+
+    // ——— 横向滑动 ———
+    function clampScroll(v) {
+      return Math.max(0, Math.min(maxScroll, v));
+    }
+
+    function setScroll(x) {
+      scrollX = clampScroll(x);
+      updateScrollUI();
+    }
+
+    function updateScrollUI() {
+      const panel = Math.round(scrollX / VIEW_W);
+      scrollDots.querySelectorAll('.scroll-dot').forEach((dot, i) => {
+        dot.classList.toggle('active', i === panel);
+      });
+      scrollHint.classList.toggle('hidden', scrollX > 40 && scrollX < maxScroll - 40);
+    }
+
+    for (let i = 0; i < PANEL_COUNT; i++) {
+      const dot = document.createElement('div');
+      dot.className = 'scroll-dot' + (i === 0 ? ' active' : '');
+      scrollDots.appendChild(dot);
+    }
+
+    let isPanning = false;
+    let panStartX = 0;
+    let panStartScroll = 0;
+    let panMoved = false;
+    const DRAG_THRESHOLD = 6;
+
+    function onPanStart(clientX) {
+      if (overlay.classList.contains('active')) return;
+      isPanning = true;
+      panMoved = false;
+      panStartX = clientX;
+      panStartScroll = scrollX;
+      canvas.classList.add('grabbing');
+    }
+
+    function onPanMove(clientX) {
+      if (!isPanning) return;
+      const dx = (clientX - panStartX) / viewScale;
+      if (Math.abs(dx) > DRAG_THRESHOLD) panMoved = true;
+      setScroll(panStartScroll - dx);
+    }
+
+    function onPanEnd() {
+      if (!isPanning) return;
+      isPanning = false;
+      canvas.classList.remove('grabbing');
+    }
+
+    viewport.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      onPanStart(e.clientX);
+    });
+    window.addEventListener('mousemove', (e) => onPanMove(e.clientX));
+    window.addEventListener('mouseup', onPanEnd);
+
+    viewport.addEventListener('touchstart', (e) => {
+      if (overlay.classList.contains('active')) return;
+      onPanStart(e.touches[0].clientX);
+    }, { passive: true });
+    viewport.addEventListener('touchmove', (e) => {
+      onPanMove(e.touches[0].clientX);
+    }, { passive: true });
+
+    viewport.addEventListener('wheel', (e) => {
+      if (overlay.classList.contains('active')) return;
+      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      setScroll(scrollX + delta);
+      e.preventDefault();
+    }, { passive: false });
+
+    // 坐标转换（视口缩放 + 横向滚动）
+    function getCanvasPosFromClient(clientX, clientY) {
+      const rect = viewport.getBoundingClientRect();
+      return {
+        x: (clientX - rect.left) / viewScale + scrollX,
+        y: (clientY - rect.top) / viewScale,
+      };
+    }
+
+    function getCanvasPos(e) {
+      return getCanvasPosFromClient(e.clientX, e.clientY);
+    }
+
+    function hitBubble(worldX, worldY) {
+      // 优先命中近处（z 大）气泡，与绘制层级一致
+      const sorted = [...bubbles].sort((a, b) => a.z - b.z || a.r - b.r);
+      for (let i = sorted.length - 1; i >= 0; i--) {
+        if (sorted[i].contains(worldX, worldY, scrollX)) return sorted[i];
+      }
+      return null;
+    }
+
+    function tryOpenBubbleAt(clientX, clientY) {
+      const { x, y } = getCanvasPosFromClient(clientX, clientY);
+      const bubble = hitBubble(x, y);
+      if (bubble) {
+        openCard(bubble);
+        bubble.vx += (Math.random() - 0.5) * 0.35;
+        bubble.vy += (Math.random() - 0.5) * 0.35;
+      }
+    }
+
+    viewport.addEventListener('mousemove', (e) => {
+      if (isPanning) return;
+      const { x, y } = getCanvasPos(e);
+      const found = hitBubble(x, y);
+
+      if (hoveredBubble && hoveredBubble !== found) {
+        hoveredBubble.targetHoverScale = 1;
+      }
+      hoveredBubble = found;
+      if (found) {
+        found.targetHoverScale = 1.06;
+        canvas.classList.add('pointer');
+      } else {
+        canvas.classList.remove('pointer');
+      }
+    });
+
+    viewport.addEventListener('click', (e) => {
+      if (panMoved) return;
+      tryOpenBubbleAt(e.clientX, e.clientY);
+    });
+
+    viewport.addEventListener('touchend', (e) => {
+      if (!panMoved && !overlay.classList.contains('active')) {
+        const t = e.changedTouches[0];
+        if (t) tryOpenBubbleAt(t.clientX, t.clientY);
+      }
+      onPanEnd();
+    });
+
+    function openCard(bubble) {
+      activeBubble = bubble;
+      cardTitle.textContent = bubble.title;
+      if (bubble.products && bubble.products.length) {
+        cardBody.innerHTML = bubble.products.map(p =>
+          `<div style="margin-bottom:14px"><strong>${p.name}</strong>${p.intro ? `<div style="margin-top:6px;font-size:14px;color:#666;line-height:1.6">${p.intro.replace(/\n/g, '<br>')}</div>` : ''}</div>`
+        ).join('');
+        cardBody.classList.remove('placeholder');
+      } else if (bubble.content) {
+        cardBody.textContent = bubble.content;
+        cardBody.classList.remove('placeholder');
+      } else {
+        cardBody.textContent = '此处放置展示内容';
+        cardBody.classList.add('placeholder');
+      }
+      overlay.classList.add('active');
+    }
+
+    function closeCard() {
+      overlay.classList.remove('active');
+      activeBubble = null;
+    }
+
+    cardClose.addEventListener('click', closeCard);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeCard();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeCard();
+    });
+  </script>
+</body>
+</html>
