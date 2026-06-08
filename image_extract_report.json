@@ -1,8 +1,8 @@
 {
-  "can_read_images": false,
+  "can_read_images": true,
   "media_png_count": 198,
   "dispimg_mapping_count": 198,
   "rows_with_images": 175,
-  "fully_resolved_rows": 162,
-  "unresolved_rows": 13
+  "fully_resolved_rows": 175,
+  "unresolved_rows": 0
 }

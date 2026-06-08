@@ -102,12 +102,16 @@
       transform: scale(1.25);
     }
 
-    /* 卡片遮罩 */
+    #viewport.card-open #canvas,
+    #viewport.card-open #scroll-hint {
+      visibility: hidden;
+    }
+
+    /* 卡片遮罩 — 仅承载卡片，不遮挡背景 */
     #overlay {
       position: absolute;
       inset: 0;
-      background: rgba(0, 0, 0, 0.55);
-      backdrop-filter: blur(6px);
+      background: transparent;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -122,70 +126,528 @@
       pointer-events: auto;
     }
 
-    /* 内容卡片 */
+    /* 内容卡片 — Figma 组合 11 (49:337) */
     #card {
-      width: 560px;
-      min-height: 360px;
-      background: rgba(255, 255, 255, 0.96);
-      border-radius: 20px;
-      box-shadow:
-        0 24px 80px rgba(0, 0, 0, 0.45),
-        0 0 0 1px rgba(255, 255, 255, 0.15);
-      padding: 40px 48px;
-      transform: scale(0.88) translateY(20px);
-      transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
       position: relative;
+      width: 1473px;
+      height: 960px;
+      transform: scale(0.94) translateY(12px);
+      transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
     }
 
     #overlay.active #card {
       transform: scale(1) translateY(0);
     }
 
-    #card-close {
+    .card-outer-border {
       position: absolute;
-      top: 18px;
-      right: 22px;
-      width: 36px;
-      height: 36px;
-      border: none;
-      background: rgba(0, 0, 0, 0.06);
-      border-radius: 50%;
-      cursor: pointer;
-      font-size: 20px;
-      line-height: 1;
-      color: #666;
-      transition: background 0.2s;
+      left: 66px;
+      top: 0;
+      width: 1407px;
+      height: 920px;
+      border: 1.72px solid #2a4266;
+      pointer-events: none;
+      z-index: 3;
     }
 
-    #card-close:hover {
-      background: rgba(0, 0, 0, 0.12);
-      color: #333;
+    .card-outer-bottom {
+      position: absolute;
+      left: 66px;
+      top: 953px;
+      width: 1406px;
+      height: 2px;
+      background: #2a4266;
+      pointer-events: none;
+      z-index: 3;
     }
 
-    #card-title {
-      font-family: "MiSans VF", "MiSans", sans-serif;
-      font-size: 22px;
-      font-weight: 600;
-      color: #1a1a1a;
-      margin-bottom: 16px;
+    .card-tab {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 66px;
+      height: 290px;
+      z-index: 4;
+      pointer-events: none;
     }
 
-    #card-body {
-      font-family: "MiSans VF", "MiSans", sans-serif;
-      font-size: 16px;
-      line-height: 1.7;
-      color: #555;
-      min-height: 200px;
+    .card-tab svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      transform: scale(-1, -1);
+      transform-origin: center;
     }
 
-    #card-body.placeholder {
+    .card-tab-label {
+      position: absolute;
+      left: 0;
+      top: 24px;
+      width: 67px;
+      height: 166px;
       display: flex;
       align-items: center;
       justify-content: center;
-      border: 2px dashed rgba(0, 0, 0, 0.08);
-      border-radius: 12px;
-      color: #aaa;
-      font-size: 15px;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .card-tab-label-text {
+      display: inline-block;
+      font-size: 41px;
+      font-weight: 500;
+      color: #dbeaff;
+      letter-spacing: 0.12em;
+      line-height: 66px;
+      white-space: nowrap;
+      transform: rotate(270deg);
+    }
+
+    .card-panel {
+      position: absolute;
+      left: 85px;
+      top: 20px;
+      width: 1368px;
+      height: 881px;
+      overflow: hidden;
+    }
+
+    .card-body-bg {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        118deg,
+        rgba(10, 24, 26, 0.72) 0%,
+        rgba(16, 35, 38, 0.02) 47.6%,
+        rgba(10, 24, 26, 0.72) 100%
+      );
+      pointer-events: none;
+    }
+
+    .card-header {
+      position: absolute;
+      left: 33px;
+      top: 33px;
+      width: 1281px;
+      height: 53px;
+      background: linear-gradient(270deg, rgba(11, 24, 26, 0.58) 0%, rgba(42, 65, 102, 0.44) 100%);
+      z-index: 2;
+    }
+
+    .card-header-accent {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 5px;
+      height: 100%;
+      background: #046eff;
+    }
+
+    #card-title {
+      position: absolute;
+      left: 33px;
+      top: 7px;
+      right: 24px;
+      margin: 0;
+      font-family: "MiSans VF", "MiSans", sans-serif;
+      font-size: 31px;
+      font-weight: 500;
+      color: #9ebcd9;
+      line-height: 1.37;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #card-body {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 198px;
+      bottom: 35px;
+      z-index: 1;
+      overflow-x: hidden;
+      overflow-y: auto;
+      padding: 0 54px 12px;
+      scrollbar-width: thin;
+      scrollbar-color: #c9d9eb transparent;
+    }
+
+    #card-body::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    #card-body::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    #card-body::-webkit-scrollbar-thumb {
+      background: #c9d9eb;
+      border-radius: 3px;
+      box-shadow: 0 0 10px rgba(219, 250, 255, 0.5);
+    }
+
+    .card-content {
+      width: 1260px;
+      margin: 0 auto;
+    }
+
+    .card-columns {
+      display: flex;
+      gap: 30px;
+      align-items: flex-start;
+    }
+
+    .card-col {
+      flex: 1;
+      width: 615px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .product-block {
+      color: #fff;
+    }
+
+    .product-title {
+      margin: 0;
+      font-size: 28px;
+      font-weight: 500;
+      line-height: 1.35;
+      color: #fff;
+    }
+
+    .product-title-sm {
+      font-size: 26px;
+    }
+
+    .product-divider {
+      height: 1px;
+      margin: 12px 0 14px;
+      background: linear-gradient(90deg, rgba(42, 66, 102, 0.9), rgba(42, 66, 102, 0.2));
+    }
+
+    .product-intro {
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 1.65;
+      color: rgba(255, 255, 255, 0.92);
+    }
+
+    .product-intro p {
+      margin: 0 0 10px;
+    }
+
+    .product-intro p:last-child {
+      margin-bottom: 0;
+    }
+
+    .product-body-side {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .product-image {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .product-image img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      object-fit: contain;
+    }
+
+    .product-block-side .product-image {
+      width: 100%;
+      max-width: 612.88px;
+      margin-top: 14px;
+      justify-content: center;
+      align-self: center;
+    }
+
+    .product-block-side .product-image:not(.product-image-rotate) img {
+      width: auto;
+      max-width: 164px;
+      max-height: 204px;
+      height: auto;
+      object-fit: contain;
+    }
+
+    .product-block-side .product-image-rotate {
+      width: 132px;
+      height: 196px;
+      margin-top: 12px;
+      justify-content: center;
+      align-items: center;
+      align-self: center;
+      overflow: visible;
+    }
+
+    .product-block-side .product-image-rotate img {
+      width: 194px;
+      max-width: none;
+      height: auto;
+      transform: rotate(90deg);
+      transform-origin: center center;
+    }
+
+    .product-block-stack {
+      width: 100%;
+    }
+
+    .product-block-stack .product-image {
+      width: 100%;
+      margin-top: 14px;
+      justify-content: flex-start;
+      align-items: flex-start;
+    }
+
+    .product-block-stack .product-image img {
+      width: 100%;
+      max-width: 100%;
+      height: auto;
+      object-fit: contain;
+      object-position: left top;
+    }
+
+    .product-block-stack .product-image-compact {
+      justify-content: center;
+      align-items: center;
+    }
+
+    .product-block-stack .product-image-compact img {
+      width: auto;
+      max-width: calc(164px * var(--compact-scale-factor, 1));
+      max-height: calc(164px * var(--compact-scale-factor, 1));
+      object-position: center center;
+    }
+
+    .product-block-stack .product-images-row .product-image-compact {
+      flex: 0 1 auto;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .product-block-stack .product-images-row .product-image-compact img {
+      width: auto;
+      max-width: calc(164px * var(--compact-scale-factor, 1));
+      max-height: calc(164px * var(--compact-scale-factor, 1));
+      object-position: center center;
+    }
+
+    .product-block-stack .product-images-row.product-images-row-wrap {
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .product-block-stack .product-image-scaled {
+      justify-content: center;
+      align-items: center;
+    }
+
+    .product-block-stack .product-image-scaled img {
+      width: calc(100% * var(--img-scale-factor));
+      max-width: calc(100% * var(--img-scale-factor));
+      object-position: center center;
+    }
+
+    .product-block-stack .product-image-uniform {
+      height: var(--uniform-img-height, 200px);
+      justify-content: center;
+      align-items: center;
+    }
+
+    .product-block-stack .product-image-uniform img {
+      width: auto;
+      max-width: 100%;
+      height: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      object-position: center center;
+    }
+
+    .product-block-stack .product-images-row {
+      display: flex;
+      flex-direction: row;
+      gap: 12px;
+      width: 100%;
+      margin-top: 10px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .product-block-stack .product-images-row .product-image {
+      flex: 1;
+      min-width: 0;
+      margin-top: 0;
+    }
+
+    .product-block-stack .product-images-row .product-image img {
+      width: 100%;
+      height: auto;
+      max-height: 220px;
+      object-fit: contain;
+      object-position: center center;
+    }
+
+    .product-block-stack .product-image + .product-image,
+    .product-block-side .product-image + .product-image {
+      margin-top: 10px;
+    }
+
+    .product-block-stack .product-image + .product-images-row {
+      margin-top: 10px;
+    }
+
+    .product-contact {
+      margin: 12px 0 0;
+      font-size: 14px;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.92);
+      text-align: center;
+    }
+
+    .product-block-side .product-contact {
+      text-align: center;
+      align-self: center;
+    }
+
+    .card-columns-single {
+      display: block;
+    }
+
+    .card-col-single {
+      width: 100%;
+    }
+
+    .product-block-single {
+      width: 100%;
+    }
+
+    .product-block-single .product-intro {
+      width: 100%;
+    }
+
+    .product-block-single .product-image {
+      width: 100%;
+      margin-top: 18px;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .product-block-single .product-images-row {
+      display: flex;
+      flex-direction: row;
+      gap: 16px;
+      width: 100%;
+      margin-top: 18px;
+      align-items: stretch;
+    }
+
+    .product-block-single .product-images-row .product-image {
+      flex: 1;
+      min-width: 0;
+      margin-top: 0;
+      height: 289px;
+    }
+
+    .product-block-single .product-images-row .product-image img {
+      width: 100%;
+      height: 100%;
+      max-width: 100%;
+      max-height: none;
+      object-fit: contain;
+      object-position: center center;
+    }
+
+    .product-block-single .product-image img {
+      width: 100%;
+      max-width: 100%;
+      max-height: min(52vh, 520px);
+      height: auto;
+      object-fit: contain;
+      object-position: center center;
+    }
+
+    .product-block-single .product-contact {
+      width: 100%;
+      text-align: center;
+      margin-top: 16px;
+    }
+
+    .card-divider {
+      position: absolute;
+      left: 59px;
+      width: 1249px;
+      height: 2px;
+      background: #19283d;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .card-divider-top {
+      top: 196px;
+    }
+
+    .card-divider-bottom {
+      top: 846px;
+    }
+
+    .card-dot {
+      position: absolute;
+      width: 8px;
+      height: 3px;
+      background: #046eff;
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    .card-dot-tl { left: 59px;  top: 194px; }
+    .card-dot-tr { left: 1300px; top: 194px; }
+    .card-dot-bl { left: 59px;  top: 845px; }
+    .card-dot-br { left: 1300px; top: 845px; }
+    .card-dot-rt { left: 1328px; top: 30px; }
+    .card-dot-rb { left: 1328px; top: 868px; }
+
+    .card-stage {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+    }
+
+    .card-nav {
+      flex-shrink: 0;
+      width: 56px;
+      height: 56px;
+      border: 1.5px solid rgba(120, 200, 255, 0.45);
+      border-radius: 50%;
+      background: rgba(8, 24, 48, 0.55);
+      color: rgba(219, 234, 255, 0.9);
+      font-size: 28px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, border-color 0.2s, transform 0.2s;
+      backdrop-filter: blur(4px);
+      z-index: 11;
+    }
+
+    .card-nav:hover {
+      background: rgba(14, 50, 90, 0.75);
+      border-color: rgba(160, 220, 255, 0.75);
+      transform: scale(1.06);
+    }
+
+    .card-nav:active {
+      transform: scale(0.96);
     }
   </style>
 </head>
@@ -199,16 +661,52 @@
         <div id="scroll-dots"></div>
       </div>
       <div id="overlay">
+        <div class="card-stage">
+        <button type="button" class="card-nav card-nav-prev" aria-label="上一个企业">‹</button>
         <div id="card">
-          <button id="card-close" aria-label="关闭">×</button>
-          <div id="card-title">内容卡片</div>
-          <div id="card-body" class="placeholder">此处放置展示内容</div>
+          <div class="card-outer-border"></div>
+          <div class="card-outer-bottom"></div>
+          <div class="card-tab">
+            <svg viewBox="0 0 65.76 289.82" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path fill-rule="evenodd" clip-rule="evenodd" d="M16.41 48.49C3.86 28.13 0 0 0 0v289.82h55.89c5.45 0 9.86-4.42 9.86-9.88V123.14c0-12.29-4.46-19.4-13.67-30.63C42.88 81.28 28.96 68.85 16.41 48.49Z" fill="url(#cardTabGrad)"/>
+              <defs>
+                <linearGradient id="cardTabGrad" x1="0" y1="289.82" x2="65.76" y2="289.82" gradientUnits="userSpaceOnUse">
+                  <stop stop-color="#1D4877"/>
+                  <stop offset="0.202" stop-color="#0E62BB"/>
+                  <stop offset="0.528" stop-color="#1673C9"/>
+                  <stop offset="1" stop-color="#46A2FF"/>
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+          <div class="card-tab-label">
+            <span class="card-tab-label-text">百家数科</span>
+          </div>
+          <div class="card-panel">
+            <div class="card-body-bg"></div>
+            <div class="card-header">
+              <div class="card-header-accent"></div>
+              <h1 id="card-title">雄安国创中心科技有限公司</h1>
+            </div>
+            <div class="card-divider card-divider-top"></div>
+            <div class="card-divider card-divider-bottom"></div>
+            <span class="card-dot card-dot-tl"></span>
+            <span class="card-dot card-dot-tr"></span>
+            <span class="card-dot card-dot-bl"></span>
+            <span class="card-dot card-dot-br"></span>
+            <span class="card-dot card-dot-rt"></span>
+            <span class="card-dot card-dot-rb"></span>
+            <div id="card-body"></div>
+          </div>
+        </div>
+        <button type="button" class="card-nav card-nav-next" aria-label="下一个企业">›</button>
         </div>
       </div>
     </div>
   </div>
 
   <script src="companies.js"></script>
+  <script src="product_images.js"></script>
   <script>
     const VIEW_W = 1920;
     const H = 1080;
@@ -225,7 +723,8 @@
     const overlay = document.getElementById('overlay');
     const cardTitle = document.getElementById('card-title');
     const cardBody = document.getElementById('card-body');
-    const cardClose = document.getElementById('card-close');
+    const cardPrev = document.querySelector('.card-nav-prev');
+    const cardNext = document.querySelector('.card-nav-next');
     const app = document.getElementById('app');
     const viewport = document.getElementById('viewport');
     const scrollHint = document.getElementById('scroll-hint');
@@ -353,6 +852,7 @@
         this.hoverScale = 1;
         this.targetHoverScale = 1;
         this.labelLayout = null;
+        this.index = index;
       }
 
       update(time, dt) {
@@ -615,6 +1115,7 @@
 
     function render(time) {
       ctx.clearRect(0, 0, VIEW_W, H);
+      if (overlay.classList.contains('active')) return;
 
       ctx.save();
       ctx.translate(-scrollX, 0);
@@ -631,6 +1132,7 @@
     }
 
     function physicsStep(time, dt) {
+      if (overlay.classList.contains('active')) return;
       for (const b of bubbles) b.update(time, dt);
 
       for (let i = 0; i < bubbles.length; i++) {
@@ -813,35 +1315,298 @@
       onPanEnd();
     });
 
+    const COMPANY_COLUMNS = {
+      '雄安国创中心科技有限公司': [
+        ['闻识一号模组', '基于运动想象脑控技术的教育产品', '雄安国创天巡平台'],
+        ['智冷魔方AIBOX产品', '基于RISC-V和开源鸿蒙操作系统的工业控制计算机', '生物可信认证防护系统', '“数字淀乡”时空一体化平台'],
+      ],
+      '洞见智慧科技（北京）有限公司': [
+        ['洞见密态计算一体机', '洞见可信数据空间平台', '“见智 ”安全可信大模型'],
+        ['洞见可信数据空间一体机', '洞见隐私计算平台'],
+      ],
+      '北京天创赛斯科技有限公司': [
+        ['NB-loT模组', '智慧 AED（自动体外除颤器）'],
+        ['基于PUF技术微标识安全芯片', '智慧消防'],
+      ],
+      '雄安安影科技有限公司': [
+        ['便携式颅脑出血检测分析仪', '医学多模态问答与诊断解释大模型'],
+        ['Nirvana多模态大模型'],
+      ],
+      '河北雄安星程智慧物业科技有限公司': [
+        ['星程智慧物业（社区版）'],
+        ['智慧运营', '建筑物联网', '智慧物业（商业版）'],
+      ],
+      '中电信数字城市科技有限公司': [
+        ['医疗导诊大模型', '电信数城可信数据空间', '城市运行管理服务平台'],
+        ['交管大模型', '织意智能体平台', '空地协同一体化服务平台', '智慧楼宇/智慧园区', '政务服务热线', '翼制造生产运营管理平台'],
+      ],
+      '中国铁塔（雄安）科技创新中心': [
+        ['北斗室内定位基站', '23频全网多功能POI'],
+        ['时空服务运营平台', '小塔地图APP'],
+      ],
+      '北京眼神科技有限公司': [
+        ['虹膜毒检仪', '人脸虹膜面部融合识别一体机', '虹膜锁', '手指多模态识别仪'],
+        ['心理行为分析产品', 'ABIS多模态生物识别统一平台'],
+      ],
+    };
+
+    const PRODUCT_LAYOUT = {
+      '闻识一号模组': 'side',
+      '基于运动想象脑控技术的教育产品': 'side',
+      '智冷魔方AIBOX产品': 'side',
+      '生物可信认证防护系统': 'side',
+      '雄安国创天巡平台': 'stack',
+      '基于RISC-V和开源鸿蒙操作系统的工业控制计算机': 'stack',
+      '“数字淀乡”时空一体化平台': 'stack',
+    };
+
+    const PRODUCT_IMAGE_ROTATE = new Set(['闻识一号模组']);
+
+    const PRODUCT_IMAGE_COMPACT = new Set([
+      '基于PUF技术微标识安全芯片',
+      '三维可视化料层监测装置',
+      'RISC-V内核超级SIM芯片CC2560A',
+      'RISC-V内核IoT-NTN卫星通信芯片CM6620N',
+      'RISC-V内核北斗短报文通信芯片CM3510',
+      '多模态人脸虹膜面板机',
+      '人脸虹膜面部融合识别一体机',
+      '手指多模态识别仪',
+      '虹膜毒检仪',
+      '虹膜锁',
+      'RISC-V AI训推一体机（安算昊辰 2524A）',
+      '基于RISC-V的可信安全计算芯片',
+      '安算可信安全高精度定位模组（FusionSecure-U）',
+      '微型工控机',
+    ]);
+
+    const PRODUCT_IMAGE_COMPACT_SCALE = {
+      '三维可视化料层监测装置': 2,
+    };
+
+    const PRODUCT_IMAGE_SCALE = {
+      '卫星通讯芯片': 0.837, // area × 0.7
+      '北斗室内定位基站': 0.707, // area × 0.5
+    };
+
+    const PRODUCT_IMAGE_UNIFORM = new Set([
+      '边缘小站',
+      'AI信号机',
+    ]);
+
+    const PRODUCT_IMAGE_UNIFORM_HEIGHT = 200;
+
+    const PRODUCT_IMAGES_ROW = new Set([
+      'XMINNOV 英诺尔RISC-V 架构 RFID 多模态数据采集终端',
+      '图知大模型',
+    ]);
+
+    // Stack layout: first N images stacked, remaining images side-by-side.
+    const PRODUCT_IMAGES_ROW_AFTER = {
+      '智慧消防': 1,
+    };
+
+    const PRODUCT_TITLE_SM = new Set([
+      '雄安国创天巡平台',
+      '生物可信认证防护系统',
+      '基于RISC-V和开源鸿蒙操作系统的工业控制计算机',
+      '“数字淀乡”时空一体化平台',
+    ]);
+
+    function escapeHtml(text) {
+      return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function formatIntro(intro) {
+      if (!intro) return '';
+      const lines = intro.split('\n').map((line) => line.trim()).filter(Boolean);
+      if (lines.length <= 1) return `<p>${escapeHtml(intro)}</p>`;
+      return lines.map((line) => `<p>${escapeHtml(line)}</p>`).join('');
+    }
+
+    function splitProducts(products) {
+      const left = [];
+      const right = [];
+      products.forEach((product, index) => {
+        (index % 2 === 0 ? left : right).push(product);
+      });
+      return [left, right];
+    }
+
+    function getProductLayout(name) {
+      return PRODUCT_LAYOUT[name] || 'stack';
+    }
+
+    function getProductImages(product) {
+      if (product.images && product.images.length) return product.images;
+      const fallback = PRODUCT_IMAGES[product.name];
+      return fallback ? [fallback] : [];
+    }
+
+    function renderProductImages(product, layout, company = '') {
+      const images = getProductImages(product);
+      if (!images.length) return '';
+
+      const renderOne = (src, index) => {
+        const rotate = layout === 'side' && PRODUCT_IMAGE_ROTATE.has(product.name) && index === 0;
+        const compact = layout === 'stack' && PRODUCT_IMAGE_COMPACT.has(product.name);
+        const uniform = layout === 'stack' && PRODUCT_IMAGE_UNIFORM.has(product.name);
+        const compactScale = layout === 'stack' ? PRODUCT_IMAGE_COMPACT_SCALE[product.name] : null;
+        const scale = layout === 'stack' ? PRODUCT_IMAGE_SCALE[product.name] : null;
+        const cls = [
+          'product-image',
+          rotate ? 'product-image-rotate' : '',
+          compact ? 'product-image-compact' : '',
+          uniform ? 'product-image-uniform' : '',
+          scale ? 'product-image-scaled' : '',
+        ].filter(Boolean).join(' ');
+        const scaleVars = [];
+        if (compactScale) scaleVars.push(`--compact-scale-factor: ${compactScale}`);
+        if (uniform) scaleVars.push(`--uniform-img-height: ${PRODUCT_IMAGE_UNIFORM_HEIGHT}px`);
+        if (scale) scaleVars.push(`--img-scale-factor: ${scale}`);
+        const scaleStyle = scaleVars.length ? ` style="${scaleVars.join('; ')}"` : '';
+        return `<div class="${cls}"${scaleStyle}><img src="${escapeHtml(src)}" alt=""></div>`;
+      };
+
+      if (layout === 'single' && images.length > 1 && PRODUCT_IMAGES_ROW.has(product.name)) {
+        return `<div class="product-images-row">${images.map(renderOne).join('')}</div>`;
+      }
+
+      const rowAfter = layout === 'stack' ? PRODUCT_IMAGES_ROW_AFTER[product.name] : null;
+      if (rowAfter != null && images.length > rowAfter) {
+        const head = images.slice(0, rowAfter).map((src, index) => renderOne(src, index)).join('');
+        const tail = images.slice(rowAfter);
+        const wrap = tail.length > 2 ? ' product-images-row-wrap' : '';
+        const row = `<div class="product-images-row${wrap}">${tail.map((src, index) => renderOne(src, rowAfter + index)).join('')}</div>`;
+        return head + row;
+      }
+
+      return images.map(renderOne).join('');
+    }
+
+    function renderProductBlock(product, options = {}) {
+      const { single = false, company = '' } = options;
+      const layout = single ? 'single' : getProductLayout(product.name);
+      const contact = product.contact || '';
+      const titleClass = PRODUCT_TITLE_SM.has(product.name) ? 'product-title product-title-sm' : 'product-title';
+      const imageHtml = renderProductImages(product, layout, company);
+      const contactHtml = contact
+        ? `<p class="product-contact">${escapeHtml(contact)}</p>`
+        : '';
+
+      if (single) {
+        return `
+          <article class="product-block product-block-single">
+            <h2 class="${titleClass}">${escapeHtml(product.name)}</h2>
+            <div class="product-divider"></div>
+            <div class="product-intro">${formatIntro(product.intro)}</div>
+            ${imageHtml}
+            ${contactHtml}
+          </article>`;
+      }
+
+      if (layout === 'side') {
+        return `
+          <article class="product-block product-block-side">
+            <h2 class="${titleClass}">${escapeHtml(product.name)}</h2>
+            <div class="product-divider"></div>
+            <div class="product-body-side">
+              <div class="product-intro">${formatIntro(product.intro)}</div>
+              ${imageHtml}
+              ${contactHtml}
+            </div>
+          </article>`;
+      }
+
+      return `
+        <article class="product-block product-block-stack">
+          <h2 class="${titleClass}">${escapeHtml(product.name)}</h2>
+          <div class="product-divider"></div>
+          <div class="product-intro">${formatIntro(product.intro)}</div>
+          ${imageHtml}
+          ${contactHtml}
+        </article>`;
+    }
+
+    function renderCardContent(bubble) {
+      const products = bubble.products || [];
+      if (!products.length) {
+        cardBody.innerHTML = '';
+        return;
+      }
+
+      if (products.length === 1) {
+        cardBody.innerHTML = `
+          <div class="card-content">
+            <div class="card-columns card-columns-single">
+              <div class="card-col card-col-single">
+                ${renderProductBlock(products[0], { single: true, company: bubble.title })}
+              </div>
+            </div>
+          </div>`;
+        cardBody.scrollTop = 0;
+        return;
+      }
+
+      let columns;
+      const customColumns = COMPANY_COLUMNS[bubble.title];
+      if (customColumns) {
+        const productMap = Object.fromEntries(products.map((product) => [product.name, product]));
+        columns = customColumns.map((names) => names.map((name) => productMap[name]).filter(Boolean));
+      } else {
+        columns = splitProducts(products);
+      }
+
+      cardBody.innerHTML = `
+        <div class="card-content">
+          <div class="card-columns">
+            <div class="card-col">${columns[0].map((p) => renderProductBlock(p, { company: bubble.title })).join('')}</div>
+            <div class="card-col">${columns[1].map((p) => renderProductBlock(p, { company: bubble.title })).join('')}</div>
+          </div>
+        </div>`;
+      cardBody.scrollTop = 0;
+    }
+
     function openCard(bubble) {
       activeBubble = bubble;
       cardTitle.textContent = bubble.title;
-      if (bubble.products && bubble.products.length) {
-        cardBody.innerHTML = bubble.products.map(p =>
-          `<div style="margin-bottom:14px"><strong>${p.name}</strong>${p.intro ? `<div style="margin-top:6px;font-size:14px;color:#666;line-height:1.6">${p.intro.replace(/\n/g, '<br>')}</div>` : ''}</div>`
-        ).join('');
-        cardBody.classList.remove('placeholder');
-      } else if (bubble.content) {
-        cardBody.textContent = bubble.content;
-        cardBody.classList.remove('placeholder');
-      } else {
-        cardBody.textContent = '此处放置展示内容';
-        cardBody.classList.add('placeholder');
-      }
+      renderCardContent(bubble);
+      viewport.classList.add('card-open');
       overlay.classList.add('active');
     }
 
     function closeCard() {
       overlay.classList.remove('active');
+      viewport.classList.remove('card-open');
       activeBubble = null;
     }
 
-    cardClose.addEventListener('click', closeCard);
+    function navigateCard(delta) {
+      if (!activeBubble) return;
+      const nextIndex = (activeBubble.index + delta + bubbles.length) % bubbles.length;
+      openCard(bubbles[nextIndex]);
+    }
+
+    cardPrev.addEventListener('click', (e) => {
+      e.stopPropagation();
+      navigateCard(-1);
+    });
+    cardNext.addEventListener('click', (e) => {
+      e.stopPropagation();
+      navigateCard(1);
+    });
+
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) closeCard();
     });
     document.addEventListener('keydown', (e) => {
+      if (!overlay.classList.contains('active')) return;
       if (e.key === 'Escape') closeCard();
+      if (e.key === 'ArrowLeft') navigateCard(-1);
+      if (e.key === 'ArrowRight') navigateCard(1);
     });
   </script>
 </body>

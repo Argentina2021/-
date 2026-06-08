@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pandas as pd
 
-path = Path(r'c:\Users\zengy\xwechat_files\wxid_f0l3v302nftx12_75fe\msg\file\2026-05\4dc1d8c545cd61f7b8065fc98acc5311.xlsx')
-out_dir = Path(r'e:\雄安科技展\百家数科\extracted_images')
+path = Path(__file__).parent / '4dc1d8c545cd61f7b8065fc98acc5311.xlsx'
+out_dir = Path(__file__).parent / 'extracted_images'
 out_dir.mkdir(parents=True, exist_ok=True)
 
 with zipfile.ZipFile(path) as z:
@@ -22,14 +22,15 @@ with zipfile.ZipFile(path) as z:
             continue
         rid_to_media[m.group(1)] = target if target.startswith('xl/') else f'xl/{target}'
 
-    ids = re.findall(r'name="([^"]+)"', cellimages)
-    rids = re.findall(r'r:embed="(rId\d+)"', cellimages)
     id_to_file = {}
-    for i, img_id in enumerate(ids):
-        if i < len(rids):
-            media = rid_to_media.get(rids[i])
-            if media:
-                id_to_file[img_id] = media
+    for block in re.split(r'(?=<etc:cellImage>)', cellimages):
+        name_m = re.search(r'name="([^"]+)"', block)
+        rid_m = re.search(r'r:embed="(rId\d+)"', block)
+        if not name_m or not rid_m:
+            continue
+        media = rid_to_media.get(rid_m.group(1))
+        if media:
+            id_to_file[name_m.group(1)] = media
 
     extracted = 0
     for img_id, media_path in id_to_file.items():
@@ -42,12 +43,10 @@ print('Media PNG files in xlsx:', len(media_files))
 print('cellimages ID mappings:', len(id_to_file))
 print('Extracted by ID:', extracted)
 
-# Match DISPIMG in sheets
 def parse_dispimg(val):
     if pd.isna(val):
         return []
-    m = re.findall(r'DISPIMG\("([^"]+)"', str(val))
-    return m
+    return re.findall(r'DISPIMG\("([^"]+)"', str(val))
 
 results = []
 for sheet_idx, sheet_name in enumerate(['央企数科', '非央企数科']):
@@ -55,7 +54,7 @@ for sheet_idx, sheet_name in enumerate(['央企数科', '非央企数科']):
     cols = list(df.columns)
     for row_i, row in df.iterrows():
         imgs = []
-        for col in cols[2:7]:
+        for col in cols[2:]:
             imgs.extend(parse_dispimg(row[col]))
         imgs = list(dict.fromkeys(imgs))
         product = row[cols[0]] if pd.notna(row[cols[0]]) else None
@@ -88,7 +87,7 @@ report = {
     'fully_resolved_rows': len(resolved),
     'unresolved_rows': len(unresolved),
 }
-Path(r'e:\雄安科技展\百家数科\image_extract_report.json').write_text(
+Path(__file__).parent.joinpath('image_extract_report.json').write_text(
     json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8'
 )
 print(json.dumps(report, ensure_ascii=False, indent=2))
