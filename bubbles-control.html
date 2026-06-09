@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080, user-scalable=no">
+  <title>百家数科 — 一体机操控</title>
+  <link rel="stylesheet" href="fonts/misans-vf.css">
+  <link rel="stylesheet" href="css/bubbles-common.css">
+</head>
+<body class="role-control">
+  <div id="app">
+    <div id="viewport">
+      <video id="bg-video" autoplay muted loop playsinline preload="auto"></video>
+      <canvas id="canvas"></canvas>
+      <div id="sync-status" class="waiting">等待大屏连接…</div>
+      <div id="scroll-hint">
+        <span>← 左右滑动浏览更多 →</span>
+        <div id="scroll-dots"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="companies.js"></script>
+  <script src="js/bubbles-sync.js"></script>
+  <script src="js/card-renderer.js"></script>
+  <script src="js/dual-screen-core.js"></script>
+  <script>
+    createDualScreenApp({ role: 'control' });
+  </script>
+</body>
+</html>

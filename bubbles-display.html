@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <title>百家数科 — 大屏展示</title>
+  <link rel="stylesheet" href="fonts/misans-vf.css">
+  <link rel="stylesheet" href="css/bubbles-common.css">
+  <link rel="stylesheet" href="css/bubbles-card.css">
+</head>
+<body class="role-display">
+  <div id="app">
+    <div id="viewport">
+      <video id="bg-video" autoplay muted loop playsinline preload="auto"></video>
+      <canvas id="canvas"></canvas>
+      <div id="sync-status" class="waiting">等待一体机连接…</div>
+      <div id="scroll-hint">
+        <span>← 左右滑动浏览更多 →</span>
+        <div id="scroll-dots"></div>
+      </div>
+      <div id="overlay">
+        <div class="card-stage">
+          <button type="button" class="card-nav card-nav-prev" aria-label="上一个企业">‹</button>
+          <div id="card">
+            <div class="card-outer-border"></div>
+            <div class="card-outer-bottom"></div>
+            <div class="card-tab">
+              <svg viewBox="0 0 65.76 289.82" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M16.41 48.49C3.86 28.13 0 0 0 0v289.82h55.89c5.45 0 9.86-4.42 9.86-9.88V123.14c0-12.29-4.46-19.4-13.67-30.63C42.88 81.28 28.96 68.85 16.41 48.49Z" fill="url(#cardTabGrad)"/>
+                <defs>
+                  <linearGradient id="cardTabGrad" x1="0" y1="289.82" x2="65.76" y2="289.82" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#1D4877"/>
+                    <stop offset="0.202" stop-color="#0E62BB"/>
+                    <stop offset="0.528" stop-color="#1673C9"/>
+                    <stop offset="1" stop-color="#46A2FF"/>
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+            <div class="card-tab-label">
+              <span class="card-tab-label-text">百家数科</span>
+            </div>
+            <div class="card-panel">
+              <div class="card-body-bg"></div>
+              <div class="card-header">
+                <div class="card-header-accent"></div>
+                <h1 id="card-title">雄安国创中心科技有限公司</h1>
+              </div>
+              <div class="card-divider card-divider-top"></div>
+              <div class="card-divider card-divider-bottom"></div>
+              <span class="card-dot card-dot-tl"></span>
+              <span class="card-dot card-dot-tr"></span>
+              <span class="card-dot card-dot-bl"></span>
+              <span class="card-dot card-dot-br"></span>
+              <span class="card-dot card-dot-rt"></span>
+              <span class="card-dot card-dot-rb"></span>
+              <div id="card-body"></div>
+            </div>
+          </div>
+          <button type="button" class="card-nav card-nav-next" aria-label="下一个企业">›</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="companies.js"></script>
+  <script src="product_images.js"></script>
+  <script src="js/bubbles-sync.js"></script>
+  <script src="js/card-renderer.js"></script>
+  <script src="js/dual-screen-core.js"></script>
+  <script>
+    createDualScreenApp({ role: 'display' });
+  </script>
+</body>
+</html>
