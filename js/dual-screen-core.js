@@ -418,10 +418,38 @@
       return Math.max(0, Math.min(maxScroll, v));
     }
 
-    function scrollToBubble(bubble, fromRemote) {
+    let scrollAnim = null;
+    const SCROLL_ANIM_MS = 180;
+
+    function cancelScrollAnim() {
+      if (scrollAnim != null) {
+        cancelAnimationFrame(scrollAnim);
+        scrollAnim = null;
+      }
+    }
+
+    function scrollToBubble(bubble, fromRemote, animated = true) {
       if (!bubble) return;
       const targetScroll = clampScroll(bubble.x - VIEW_W * 0.5);
-      setScroll(targetScroll, fromRemote);
+      if (fromRemote || !animated) {
+        cancelScrollAnim();
+        setScroll(targetScroll, fromRemote);
+        return;
+      }
+      cancelScrollAnim();
+      const startScroll = scrollX;
+      const startTime = performance.now();
+      function tick(now) {
+        const t = Math.min(1, (now - startTime) / SCROLL_ANIM_MS);
+        const eased = 1 - Math.pow(1 - t, 3);
+        setScroll(startScroll + (targetScroll - startScroll) * eased);
+        if (t < 1) {
+          scrollAnim = requestAnimationFrame(tick);
+        } else {
+          scrollAnim = null;
+        }
+      }
+      scrollAnim = requestAnimationFrame(tick);
     }
 
     function broadcastState() {
@@ -512,10 +540,8 @@
         return;
       }
       setActiveBubble(bubble);
-      scrollToBubble(bubble);
+      scrollToBubble(bubble, false, true);
       sync.send({ type: 'select', index: bubble.index });
-      bubble.vx += (Math.random() - 0.5) * 0.35;
-      bubble.vy += (Math.random() - 0.5) * 0.35;
     }
 
     // ——— 背景视频 ———
@@ -555,46 +581,89 @@
     requestAnimationFrame(loop);
 
     // ——— 滑动交互（仅一体机） ———
-    let isPanning = false;
+    const DRAG_THRESHOLD_MOUSE = 6;
+    const DRAG_THRESHOLD_TOUCH = 16;
+
+    let pointerActive = false;
+    let pointerId = null;
+    let pointerIsTouch = false;
     let panStartX = 0;
     let panStartScroll = 0;
+    let panCommitted = false;
     let panMoved = false;
-    const DRAG_THRESHOLD = 6;
+    let suppressClick = false;
 
-    function onPanStart(clientX) {
-      if (!isControl || cardOpen) return;
-      isPanning = true;
-      panMoved = false;
-      panStartX = clientX;
-      panStartScroll = scrollX;
-      canvas.classList.add('grabbing');
+    function getDragThreshold(isTouch) {
+      return isTouch ? DRAG_THRESHOLD_TOUCH : DRAG_THRESHOLD_MOUSE;
     }
 
-    function onPanMove(clientX) {
-      if (!isPanning) return;
-      const dx = (clientX - panStartX) / viewScale;
-      if (Math.abs(dx) > DRAG_THRESHOLD) panMoved = true;
+    function onPointerDown(e) {
+      if (!isControl || cardOpen) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+      cancelScrollAnim();
+      pointerActive = true;
+      pointerId = e.pointerId;
+      pointerIsTouch = e.pointerType === 'touch';
+      panCommitted = false;
+      panMoved = false;
+      panStartX = e.clientX;
+      panStartScroll = scrollX;
+      canvas.classList.add('grabbing');
+      viewport.setPointerCapture(e.pointerId);
+    }
+
+    function onPointerMove(e) {
+      if (!pointerActive || e.pointerId !== pointerId) return;
+
+      const dx = (e.clientX - panStartX) / viewScale;
+      const dist = Math.abs(dx);
+
+      // A：未超过阈值前不滚动（滑动死区）
+      if (!panCommitted) {
+        if (dist <= getDragThreshold(pointerIsTouch)) return;
+        panCommitted = true;
+        panMoved = true;
+      }
+
       setScroll(panStartScroll - dx);
     }
 
-    function onPanEnd() {
-      if (!isPanning) return;
-      isPanning = false;
+    function onPointerUp(e) {
+      if (!pointerActive || e.pointerId !== pointerId) return;
+
+      if (!panMoved) {
+        tryInteractAt(e.clientX, e.clientY);
+      }
+      suppressClick = true;
+
+      pointerActive = false;
+      pointerId = null;
+      panCommitted = false;
+      panMoved = false;
       canvas.classList.remove('grabbing');
+      try { viewport.releasePointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+    }
+
+    function onPointerCancel(e) {
+      if (!pointerActive || e.pointerId !== pointerId) return;
+      pointerActive = false;
+      pointerId = null;
+      panCommitted = false;
+      panMoved = false;
+      suppressClick = true;
+      canvas.classList.remove('grabbing');
+      try { viewport.releasePointerCapture(e.pointerId); } catch (_) { /* ignore */ }
     }
 
     if (isControl) {
-      viewport.addEventListener('mousedown', (e) => {
-        if (e.button !== 0) return;
-        onPanStart(e.clientX);
-      });
-      window.addEventListener('mousemove', (e) => onPanMove(e.clientX));
-      window.addEventListener('mouseup', onPanEnd);
-
-      viewport.addEventListener('touchstart', (e) => onPanStart(e.touches[0].clientX), { passive: true });
-      viewport.addEventListener('touchmove', (e) => onPanMove(e.touches[0].clientX), { passive: true });
+      viewport.addEventListener('pointerdown', onPointerDown);
+      viewport.addEventListener('pointermove', onPointerMove);
+      viewport.addEventListener('pointerup', onPointerUp);
+      viewport.addEventListener('pointercancel', onPointerCancel);
 
       viewport.addEventListener('wheel', (e) => {
+        cancelScrollAnim();
         const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
         setScroll(scrollX + delta);
         e.preventDefault();
@@ -637,7 +706,7 @@
 
     if (isControl) {
       viewport.addEventListener('mousemove', (e) => {
-        if (isPanning) return;
+        if (pointerActive) return;
         const { x, y } = getCanvasPos(e);
         const found = hitBubble(x, y);
         if (hoveredBubble && hoveredBubble !== found) hoveredBubble.targetHoverScale = 1;
@@ -651,16 +720,12 @@
       });
 
       viewport.addEventListener('click', (e) => {
+        if (suppressClick) {
+          suppressClick = false;
+          return;
+        }
         if (panMoved) return;
         tryInteractAt(e.clientX, e.clientY);
-      });
-
-      viewport.addEventListener('touchend', (e) => {
-        if (!panMoved) {
-          const t = e.changedTouches[0];
-          if (t) tryInteractAt(t.clientX, t.clientY);
-        }
-        onPanEnd();
       });
     }
 
