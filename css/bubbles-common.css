@@ -20,8 +20,12 @@ html, body {
   width: 1920px;
   height: 1080px;
   overflow: hidden;
-  touch-action: none;
   background: #000;
+  touch-action: none;
+}
+
+#viewport.card-open {
+  touch-action: auto;
 }
 
 #bg-video {
@@ -75,6 +79,10 @@ html, body {
   opacity: 0;
 }
 
+#scroll-hint span::after {
+  content: ' · 点击气泡查看';
+}
+
 #scroll-dots {
   display: flex;
   gap: 8px;
@@ -93,59 +101,7 @@ html, body {
   transform: scale(1.25);
 }
 
-#sync-status {
-  position: absolute;
-  top: 20px;
-  right: 24px;
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  pointer-events: none;
-  z-index: 6;
-  transition: background 0.3s, color 0.3s, border-color 0.3s;
-  border: 1px solid rgba(120, 200, 255, 0.25);
-  background: rgba(8, 20, 40, 0.55);
-  color: rgba(180, 220, 255, 0.55);
-}
-
-#sync-status.connected {
-  border-color: rgba(80, 220, 160, 0.45);
-  background: rgba(8, 40, 30, 0.55);
-  color: rgba(160, 255, 210, 0.85);
-}
-
-#sync-status.waiting {
-  border-color: rgba(255, 200, 80, 0.35);
-  color: rgba(255, 220, 140, 0.75);
-}
-
-#sync-status::before {
-  content: '';
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  margin-right: 8px;
-  vertical-align: middle;
-  background: currentColor;
-  opacity: 0.7;
-}
-
-#sync-status.connected::before {
-  box-shadow: 0 0 8px rgba(80, 255, 180, 0.6);
-}
-
-.role-control #scroll-hint span::after {
-  content: ' · 点击气泡选中';
-}
-
-.role-display #canvas {
-  cursor: default;
-}
-
-.role-display #viewport.card-open #canvas,
-.role-display #viewport.card-open #scroll-hint {
+#viewport.card-open #canvas,
+#viewport.card-open #scroll-hint {
   visibility: hidden;
 }

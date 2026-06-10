@@ -1,5 +1,5 @@
 /**
- * 双屏气泡交互核心 — role: 'control' | 'display'
+ * 气泡交互 — 单屏一体机
  */
 (function (global) {
   const VIEW_W = 1920;
@@ -186,13 +186,8 @@
     return configs;
   }
 
-  function createDualScreenApp(options) {
-    const role = options.role;
-    const isControl = role === 'control';
-    const isDisplay = role === 'display';
-    const sync = new global.BubblesSync(role);
-
-    const companies = typeof COMPANIES !== 'undefined' ? COMPANIES : (global.COMPANIES || []);
+  function createBubblesApp() {
+    const companies = typeof COMPANIES !== 'undefined' ? COMPANIES : [];
     const bubbleCount = companies.length;
     const bubblesPerView = 30;
     const panelCount = Math.ceil(bubbleCount / bubblesPerView);
@@ -204,13 +199,10 @@
     const overlay = document.getElementById('overlay');
     const cardTitle = document.getElementById('card-title');
     const cardBody = document.getElementById('card-body');
-    const cardPrev = document.querySelector('.card-nav-prev');
-    const cardNext = document.querySelector('.card-nav-next');
     const app = document.getElementById('app');
     const viewport = document.getElementById('viewport');
-    const scrollHint = document.getElementById('scroll-hint');
     const scrollDots = document.getElementById('scroll-dots');
-    const syncStatus = document.getElementById('sync-status');
+    const scrollHint = document.getElementById('scroll-hint');
     const bgVideo = document.getElementById('bg-video');
 
     canvas.width = VIEW_W;
@@ -223,10 +215,8 @@
     let hoveredBubble = null;
     let activeBubble = null;
     let cardOpen = false;
-    let suppressScrollBroadcast = false;
 
-    const bubbleConfigs = generateBubbleConfigs(companies, worldW);
-    const bubbles = bubbleConfigs.map((cfg, i) => new Bubble(cfg, i));
+    const bubbles = generateBubbleConfigs(companies, worldW).map((cfg, i) => new Bubble(cfg, i));
 
     function fitStage() {
       viewScale = Math.min(window.innerWidth / VIEW_W, window.innerHeight / H);
@@ -302,8 +292,7 @@
       const dx = b.drawX(scroll) + b.swayX;
       const dy = b.y + b.swayY;
       const depthBlur = (1 - b.z) * 2.5;
-      const hasActive = activeBubble != null;
-      const dimOthers = isControl && hasActive && !b.isActive;
+      const dimOthers = activeBubble != null && !cardOpen && !b.isActive;
 
       ctx.save();
       ctx.globalAlpha = dimOthers ? b.depthAlpha * 0.42 : (b.isActive ? Math.min(1, b.depthAlpha * 1.55) : b.depthAlpha);
@@ -385,13 +374,9 @@
       ctx.restore();
     }
 
-    function shouldHideCanvas() {
-      return isDisplay && cardOpen;
-    }
-
     function render(time) {
       ctx.clearRect(0, 0, VIEW_W, H);
-      if (shouldHideCanvas()) return;
+      if (cardOpen) return;
 
       ctx.save();
       ctx.translate(-scrollX, 0);
@@ -405,7 +390,7 @@
     }
 
     function physicsStep(time, dt) {
-      if (shouldHideCanvas()) return;
+      if (cardOpen) return;
       for (const b of bubbles) b.update(time, dt, worldW);
       for (let i = 0; i < bubbles.length; i++) {
         for (let j = i + 1; j < bubbles.length; j++) {
@@ -428,12 +413,17 @@
       }
     }
 
-    function scrollToBubble(bubble, fromRemote, animated = true) {
+    function setScroll(x) {
+      scrollX = clampScroll(x);
+      updateScrollUI();
+    }
+
+    function scrollToBubble(bubble, animated = true) {
       if (!bubble) return;
       const targetScroll = clampScroll(bubble.x - VIEW_W * 0.5);
-      if (fromRemote || !animated) {
+      if (!animated) {
         cancelScrollAnim();
-        setScroll(targetScroll, fromRemote);
+        setScroll(targetScroll);
         return;
       }
       cancelScrollAnim();
@@ -443,30 +433,10 @@
         const t = Math.min(1, (now - startTime) / SCROLL_ANIM_MS);
         const eased = 1 - Math.pow(1 - t, 3);
         setScroll(startScroll + (targetScroll - startScroll) * eased);
-        if (t < 1) {
-          scrollAnim = requestAnimationFrame(tick);
-        } else {
-          scrollAnim = null;
-        }
+        if (t < 1) scrollAnim = requestAnimationFrame(tick);
+        else scrollAnim = null;
       }
       scrollAnim = requestAnimationFrame(tick);
-    }
-
-    function broadcastState() {
-      sync.send({
-        type: 'state',
-        scrollX,
-        selectedIndex: activeBubble ? activeBubble.index : null,
-        cardOpen: activeBubble != null,
-      });
-    }
-
-    function setScroll(x, fromRemote) {
-      scrollX = clampScroll(x);
-      updateScrollUI();
-      if (!fromRemote && isControl && !suppressScrollBroadcast) {
-        sync.send({ type: 'scroll', scrollX });
-      }
     }
 
     function updateScrollUI() {
@@ -483,68 +453,33 @@
       scrollDots.appendChild(dot);
     }
 
-    function setActiveBubble(bubble, fromRemote) {
+    function setActiveBubble(bubble) {
       for (const b of bubbles) {
         b.isActive = bubble != null && b === bubble;
         if (!b.isActive) b.targetHoverScale = 1;
       }
       activeBubble = bubble;
-      if (isControl && !fromRemote) {
-        sync.send({
-          type: bubble ? 'select' : 'close',
-          index: bubble ? bubble.index : null,
-        });
-      }
     }
 
-    function openCard(bubble, fromRemote) {
+    function openCard(bubble) {
       if (!bubble || !overlay) return;
-      setActiveBubble(bubble, fromRemote);
-      scrollToBubble(bubble, fromRemote);
+      setActiveBubble(bubble);
+      scrollToBubble(bubble);
       cardTitle.textContent = bubble.title;
       global.CardRenderer.renderCardContent(bubble, cardBody);
+      if (cardBody) cardBody.scrollTop = 0;
       cardOpen = true;
       viewport.classList.add('card-open');
       overlay.classList.add('active');
-      if (isDisplay && !fromRemote) {
-        sync.send({ type: 'select', index: bubble.index });
-      }
     }
 
-    function closeCard(fromRemote) {
+    function closeCard() {
       cardOpen = false;
-      if (overlay) overlay.classList.remove('active');
+      overlay.classList.remove('active');
       viewport.classList.remove('card-open');
-      setActiveBubble(null, fromRemote);
-      if (isDisplay && !fromRemote) {
-        sync.send({ type: 'close' });
-      }
+      setActiveBubble(null);
     }
 
-    function navigateCard(delta, fromRemote) {
-      if (!activeBubble) return;
-      const nextIndex = (activeBubble.index + delta + bubbles.length) % bubbles.length;
-      if (isDisplay) {
-        openCard(bubbles[nextIndex], fromRemote);
-        if (!fromRemote) sync.send({ type: 'navigate', index: nextIndex });
-      } else if (isControl) {
-        setActiveBubble(bubbles[nextIndex], fromRemote);
-        sync.send({ type: 'navigate', index: nextIndex });
-      }
-    }
-
-    function selectBubbleOnControl(bubble) {
-      if (activeBubble === bubble) {
-        setActiveBubble(null);
-        sync.send({ type: 'close' });
-        return;
-      }
-      setActiveBubble(bubble);
-      scrollToBubble(bubble, false, true);
-      sync.send({ type: 'select', index: bubble.index });
-    }
-
-    // ——— 背景视频 ———
     if (bgVideo) {
       bgVideo.src = 'bg.mp4';
       function startBgVideo() {
@@ -580,10 +515,8 @@
     }
     requestAnimationFrame(loop);
 
-    // ——— 滑动交互（仅一体机） ———
     const DRAG_THRESHOLD_MOUSE = 6;
     const DRAG_THRESHOLD_TOUCH = 16;
-
     let pointerActive = false;
     let pointerId = null;
     let pointerIsTouch = false;
@@ -598,9 +531,8 @@
     }
 
     function onPointerDown(e) {
-      if (!isControl || cardOpen) return;
+      if (cardOpen) return;
       if (e.pointerType === 'mouse' && e.button !== 0) return;
-
       cancelScrollAnim();
       pointerActive = true;
       pointerId = e.pointerId;
@@ -615,28 +547,19 @@
 
     function onPointerMove(e) {
       if (!pointerActive || e.pointerId !== pointerId) return;
-
       const dx = (e.clientX - panStartX) / viewScale;
-      const dist = Math.abs(dx);
-
-      // A：未超过阈值前不滚动（滑动死区）
       if (!panCommitted) {
-        if (dist <= getDragThreshold(pointerIsTouch)) return;
+        if (Math.abs(dx) <= getDragThreshold(pointerIsTouch)) return;
         panCommitted = true;
         panMoved = true;
       }
-
       setScroll(panStartScroll - dx);
     }
 
     function onPointerUp(e) {
       if (!pointerActive || e.pointerId !== pointerId) return;
-
-      if (!panMoved) {
-        tryInteractAt(e.clientX, e.clientY);
-      }
+      if (!panMoved) tryInteractAt(e.clientX, e.clientY);
       suppressClick = true;
-
       pointerActive = false;
       pointerId = null;
       panCommitted = false;
@@ -656,19 +579,31 @@
       try { viewport.releasePointerCapture(e.pointerId); } catch (_) { /* ignore */ }
     }
 
-    if (isControl) {
-      viewport.addEventListener('pointerdown', onPointerDown);
-      viewport.addEventListener('pointermove', onPointerMove);
-      viewport.addEventListener('pointerup', onPointerUp);
-      viewport.addEventListener('pointercancel', onPointerCancel);
-
-      viewport.addEventListener('wheel', (e) => {
-        cancelScrollAnim();
-        const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-        setScroll(scrollX + delta);
-        e.preventDefault();
-      }, { passive: false });
+    function isEventOnCardBody(e) {
+      if (!cardBody) return false;
+      const rect = cardBody.getBoundingClientRect();
+      return e.clientX >= rect.left && e.clientX <= rect.right
+        && e.clientY >= rect.top && e.clientY <= rect.bottom;
     }
+
+    viewport.addEventListener('pointerdown', onPointerDown);
+    viewport.addEventListener('pointermove', onPointerMove);
+    viewport.addEventListener('pointerup', onPointerUp);
+    viewport.addEventListener('pointercancel', onPointerCancel);
+
+    viewport.addEventListener('wheel', (e) => {
+      if (cardOpen) {
+        if (cardBody && isEventOnCardBody(e)) {
+          cardBody.scrollTop += e.deltaY;
+          e.preventDefault();
+        }
+        return;
+      }
+      cancelScrollAnim();
+      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      setScroll(scrollX + delta);
+      e.preventDefault();
+    }, { passive: false });
 
     function getCanvasPosFromClient(clientX, clientY) {
       const rect = viewport.getBoundingClientRect();
@@ -676,10 +611,6 @@
         x: (clientX - rect.left) / viewScale + scrollX,
         y: (clientY - rect.top) / viewScale,
       };
-    }
-
-    function getCanvasPos(e) {
-      return getCanvasPosFromClient(e.clientX, e.clientY);
     }
 
     function hitBubble(worldX, worldY) {
@@ -691,142 +622,49 @@
     }
 
     function tryInteractAt(clientX, clientY) {
+      if (cardOpen) return;
       const { x, y } = getCanvasPosFromClient(clientX, clientY);
       const bubble = hitBubble(x, y);
-      if (isControl) {
-        if (bubble) selectBubbleOnControl(bubble);
-        else if (activeBubble) {
-          setActiveBubble(null);
-          sync.send({ type: 'close' });
-        }
-      } else if (isDisplay && bubble) {
-        openCard(bubble);
-      }
+      if (bubble) openCard(bubble);
     }
 
-    if (isControl) {
-      viewport.addEventListener('mousemove', (e) => {
-        if (pointerActive) return;
-        const { x, y } = getCanvasPos(e);
-        const found = hitBubble(x, y);
-        if (hoveredBubble && hoveredBubble !== found) hoveredBubble.targetHoverScale = 1;
-        hoveredBubble = found;
-        if (found && !found.isActive) {
-          found.targetHoverScale = HOVER_SCALE;
-          canvas.classList.add('pointer');
-        } else {
-          canvas.classList.remove('pointer');
-        }
-      });
-
-      viewport.addEventListener('click', (e) => {
-        if (suppressClick) {
-          suppressClick = false;
-          return;
-        }
-        if (panMoved) return;
-        tryInteractAt(e.clientX, e.clientY);
-      });
-    }
-
-    // ——— 大屏卡片交互 ———
-    if (isDisplay && overlay) {
-      if (cardPrev) {
-        cardPrev.addEventListener('click', (e) => {
-          e.stopPropagation();
-          navigateCard(-1);
-        });
-      }
-      if (cardNext) {
-        cardNext.addEventListener('click', (e) => {
-          e.stopPropagation();
-          navigateCard(1);
-        });
-      }
-      overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) closeCard();
-      });
-      document.addEventListener('keydown', (e) => {
-        if (!cardOpen) return;
-        if (e.key === 'Escape') closeCard();
-        if (e.key === 'ArrowLeft') navigateCard(-1);
-        if (e.key === 'ArrowRight') navigateCard(1);
-      });
-    }
-
-    // ——— 双屏同步 ———
-    sync.on((msg) => {
-      switch (msg.type) {
-        case 'ping':
-          if (isControl) {
-            sync.send({
-              type: 'pong',
-              scrollX,
-              selectedIndex: activeBubble ? activeBubble.index : null,
-            });
-          }
-          break;
-        case 'pong':
-          break;
-        case 'state':
-          if (msg.scrollX != null) setScroll(msg.scrollX, true);
-          if (isDisplay) {
-            if (msg.selectedIndex != null) {
-              openCard(bubbles[msg.selectedIndex], true);
-            } else {
-              suppressScrollBroadcast = true;
-              closeCard(true);
-              suppressScrollBroadcast = false;
-            }
-          }
-          if (isControl && msg.selectedIndex != null) {
-            setActiveBubble(bubbles[msg.selectedIndex], true);
-          } else if (isControl && msg.selectedIndex === null) {
-            setActiveBubble(null, true);
-          }
-          break;
-        case 'scroll':
-          if (isDisplay) setScroll(msg.scrollX, true);
-          break;
-        case 'select':
-          if (isDisplay && msg.index != null) openCard(bubbles[msg.index], true);
-          if (isControl && msg.index != null) setActiveBubble(bubbles[msg.index], true);
-          break;
-        case 'close':
-          if (isDisplay) closeCard(true);
-          if (isControl) setActiveBubble(null, true);
-          break;
-        case 'navigate':
-          if (msg.index != null) {
-            if (isDisplay) openCard(bubbles[msg.index], true);
-            if (isControl) setActiveBubble(bubbles[msg.index], true);
-          }
-          break;
-        case 'request-state':
-          if (isControl) broadcastState();
-          break;
-        default:
-          break;
+    viewport.addEventListener('mousemove', (e) => {
+      if (pointerActive) return;
+      const { x, y } = getCanvasPosFromClient(e.clientX, e.clientY);
+      const found = hitBubble(x, y);
+      if (hoveredBubble && hoveredBubble !== found) hoveredBubble.targetHoverScale = 1;
+      hoveredBubble = found;
+      if (found && !found.isActive) {
+        found.targetHoverScale = HOVER_SCALE;
+        canvas.classList.add('pointer');
+      } else {
+        canvas.classList.remove('pointer');
       }
     });
 
-    if (isDisplay) {
-      sync.send({ type: 'request-state' });
+    viewport.addEventListener('click', (e) => {
+      if (suppressClick) {
+        suppressClick = false;
+        return;
+      }
+      if (panMoved) return;
+      tryInteractAt(e.clientX, e.clientY);
+    });
+
+    if (cardBody) {
+      cardBody.addEventListener('pointerdown', (e) => e.stopPropagation());
+      const cardEl = document.getElementById('card');
+      if (cardEl) cardEl.addEventListener('pointerdown', (e) => e.stopPropagation());
     }
 
-    if (syncStatus) {
-      setInterval(() => {
-        const connected = sync.isPeerConnected();
-        syncStatus.classList.toggle('connected', connected);
-        syncStatus.classList.toggle('waiting', !connected);
-        syncStatus.textContent = connected
-          ? (isControl ? '已连接大屏' : '已连接一体机')
-          : (isControl ? '等待大屏连接…' : '等待一体机连接…');
-      }, 1000);
-    }
-
-    return { sync, role };
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeCard();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (!cardOpen) return;
+      if (e.key === 'Escape') closeCard();
+    });
   }
 
-  global.createDualScreenApp = createDualScreenApp;
+  global.createBubblesApp = createBubblesApp;
 })(window);

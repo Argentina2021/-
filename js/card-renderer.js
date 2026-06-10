@@ -223,7 +223,6 @@
             </div>
           </div>
         </div>`;
-      cardBodyEl.scrollTop = 0;
       return;
     }
 
@@ -243,7 +242,6 @@
           <div class="card-col">${columns[1].map((p) => renderProductBlock(p, { company: bubble.title })).join('')}</div>
         </div>
       </div>`;
-    cardBodyEl.scrollTop = 0;
   }
 
   global.CardRenderer = { renderCardContent };

@@ -160,6 +160,9 @@
   padding: 0 54px 12px;
   scrollbar-width: thin;
   scrollbar-color: #c9d9eb transparent;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 
 #card-body::-webkit-scrollbar {
@@ -507,34 +510,5 @@
 .card-stage {
   display: flex;
   align-items: center;
-  gap: 28px;
-}
-
-.card-nav {
-  flex-shrink: 0;
-  width: 56px;
-  height: 56px;
-  border: 1.5px solid rgba(120, 200, 255, 0.45);
-  border-radius: 50%;
-  background: rgba(8, 24, 48, 0.55);
-  color: rgba(219, 234, 255, 0.9);
-  font-size: 28px;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
   justify-content: center;
-  transition: background 0.2s, border-color 0.2s, transform 0.2s;
-  backdrop-filter: blur(4px);
-  z-index: 11;
-}
-
-.card-nav:hover {
-  background: rgba(14, 50, 90, 0.75);
-  border-color: rgba(160, 220, 255, 0.75);
-  transform: scale(1.06);
-}
-
-.card-nav:active {
-  transform: scale(0.96);
 }
