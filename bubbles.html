@@ -41,6 +41,26 @@
       z-index: 0;
       pointer-events: none;
       background: #000;
+      transition: filter 0.4s ease;
+    }
+
+    #viewport.card-open #bg-video {
+      filter: brightness(1.28) saturate(1.08);
+    }
+
+    #viewport::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      background: rgba(196, 224, 255, 0.14);
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+
+    #viewport.card-open::after {
+      opacity: 1;
     }
 
     #canvas {
@@ -71,9 +91,9 @@
       transform: translateX(-50%);
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 20px;
       font-family: "MiSans VF", "MiSans", sans-serif;
-      font-size: 14px;
+      font-size: 28px;
       color: rgba(180, 230, 255, 0.45);
       pointer-events: none;
       z-index: 5;
@@ -86,12 +106,12 @@
 
     #scroll-dots {
       display: flex;
-      gap: 8px;
+      gap: 16px;
     }
 
     .scroll-dot {
-      width: 8px;
-      height: 8px;
+      width: 16px;
+      height: 16px;
       border-radius: 50%;
       background: rgba(180, 230, 255, 0.25);
       transition: background 0.3s, transform 0.3s;
@@ -182,7 +202,7 @@
     .card-tab-label {
       position: absolute;
       left: 0;
-      top: 24px;
+      top: 16px;
       width: 67px;
       height: 166px;
       display: flex;
@@ -567,9 +587,9 @@
     }
 
     .product-block-single .product-image img {
-      width: 100%;
-      max-width: 100%;
-      max-height: min(52vh, 520px);
+      width: 80%;
+      max-width: 80%;
+      max-height: min(41.6vh, 416px);
       height: auto;
       object-fit: contain;
       object-position: center center;
@@ -621,6 +641,44 @@
       gap: 28px;
     }
 
+    .card-nav-column {
+      position: relative;
+      flex-shrink: 0;
+      width: 56px;
+      height: 960px;
+      align-self: flex-start;
+    }
+
+    .card-nav-column .card-close {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .card-nav-column .card-nav-next {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .card-nav-column .card-close:hover {
+      transform: translateX(-50%) scale(1.06);
+    }
+
+    .card-nav-column .card-close:active {
+      transform: translateX(-50%) scale(0.96);
+    }
+
+    .card-nav-column .card-nav-next:hover {
+      transform: translate(-50%, -50%) scale(1.06);
+    }
+
+    .card-nav-column .card-nav-next:active {
+      transform: translate(-50%, -50%) scale(0.96);
+    }
+
     .card-nav {
       flex-shrink: 0;
       width: 56px;
@@ -648,6 +706,10 @@
 
     .card-nav:active {
       transform: scale(0.96);
+    }
+
+    .card-close {
+      font-size: 30px;
     }
   </style>
 </head>
@@ -699,7 +761,10 @@
             <div id="card-body"></div>
           </div>
         </div>
-        <button type="button" class="card-nav card-nav-next" aria-label="下一个企业">›</button>
+        <div class="card-nav-column">
+          <button type="button" class="card-nav card-close" aria-label="关闭">×</button>
+          <button type="button" class="card-nav card-nav-next" aria-label="下一个企业">›</button>
+        </div>
         </div>
       </div>
     </div>
@@ -725,6 +790,7 @@
     const cardBody = document.getElementById('card-body');
     const cardPrev = document.querySelector('.card-nav-prev');
     const cardNext = document.querySelector('.card-nav-next');
+    const cardClose = document.querySelector('.card-close');
     const app = document.getElementById('app');
     const viewport = document.getElementById('viewport');
     const scrollHint = document.getElementById('scroll-hint');
@@ -1427,11 +1493,16 @@
       return lines.map((line) => `<p>${escapeHtml(line)}</p>`).join('');
     }
 
+    const PRODUCT_COLUMN = {
+      '钢铁行业智能体': 'right',
+    };
+
     function splitProducts(products) {
       const left = [];
       const right = [];
       products.forEach((product, index) => {
-        (index % 2 === 0 ? left : right).push(product);
+        const side = PRODUCT_COLUMN[product.name] || (index % 2 === 0 ? 'left' : 'right');
+        (side === 'left' ? left : right).push(product);
       });
       return [left, right];
     }
@@ -1468,7 +1539,7 @@
         if (uniform) scaleVars.push(`--uniform-img-height: ${PRODUCT_IMAGE_UNIFORM_HEIGHT}px`);
         if (scale) scaleVars.push(`--img-scale-factor: ${scale}`);
         const scaleStyle = scaleVars.length ? ` style="${scaleVars.join('; ')}"` : '';
-        return `<div class="${cls}"${scaleStyle}><img src="${escapeHtml(src)}" alt=""></div>`;
+        return `<div class="${cls}"${scaleStyle}><img src="${escapeHtml(src)}?v=2" alt=""></div>`;
       };
 
       if (layout === 'single' && images.length > 1 && PRODUCT_IMAGES_ROW.has(product.name)) {
@@ -1487,10 +1558,16 @@
       return images.map(renderOne).join('');
     }
 
+    function getProductContact(product) {
+      const contact = (product.contact || '').trim();
+      if (!contact || /\bnan\b/i.test(contact)) return '';
+      return contact;
+    }
+
     function renderProductBlock(product, options = {}) {
       const { single = false, company = '' } = options;
       const layout = single ? 'single' : getProductLayout(product.name);
-      const contact = product.contact || '';
+      const contact = getProductContact(product);
       const titleClass = PRODUCT_TITLE_SM.has(product.name) ? 'product-title product-title-sm' : 'product-title';
       const imageHtml = renderProductImages(product, layout, company);
       const contactHtml = contact
@@ -1597,6 +1674,10 @@
     cardNext.addEventListener('click', (e) => {
       e.stopPropagation();
       navigateCard(1);
+    });
+    cardClose.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeCard();
     });
 
     overlay.addEventListener('click', (e) => {

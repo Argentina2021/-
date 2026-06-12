@@ -6,7 +6,10 @@ from pathlib import Path
 
 import pandas as pd
 
-path = Path(__file__).parent / '4dc1d8c545cd61f7b8065fc98acc5311.xlsx'
+V2_XLSX = Path(
+    r'c:\Users\zengy\xwechat_files\wxid_f0l3v302nftx12_75fe\msg\file\2026-06\补-主屏幕背后内容v2.xlsx'
+)
+path = V2_XLSX if V2_XLSX.exists() else Path(__file__).parent / '4dc1d8c545cd61f7b8065fc98acc5311.xlsx'
 out_dir = Path(__file__).parent / 'extracted_images'
 out_dir.mkdir(parents=True, exist_ok=True)
 

@@ -5,8 +5,12 @@ from pathlib import Path
 
 import pandas as pd
 
-XLSX = Path(__file__).parent / '4dc1d8c545cd61f7b8065fc98acc5311.xlsx'
+V2_XLSX = Path(
+    r'c:\Users\zengy\xwechat_files\wxid_f0l3v302nftx12_75fe\msg\file\2026-06\补-主屏幕背后内容v2.xlsx'
+)
+XLSX = V2_XLSX if V2_XLSX.exists() else Path(__file__).parent / '4dc1d8c545cd61f7b8065fc98acc5311.xlsx'
 ROOT = Path(__file__).parent
+YANGQI_CONTACT_XLSX = ROOT / '央企数科 联系人表格.xlsx'
 OUT_JSON = ROOT / 'companies.json'
 OUT_JS = ROOT / 'companies.js'
 
@@ -14,14 +18,6 @@ PRODUCT_EXCLUSIONS = {}
 
 # Excel DISPIMG IDs for these rows point at wrong media; use correct images from xlsx.
 PRODUCT_IMAGE_OVERRIDES = {
-    ('北京天创赛斯科技有限公司', '智慧 AED（自动体外除颤器）'): [
-        'extracted_images/ID_B2A84942CE674298A43DABF1E5F9B900.png',
-    ],
-    ('北京天创赛斯科技有限公司', '智慧消防'): [
-        'extracted_images/ID_30D7875D56894677AC74ABA6E613A202.png',
-        'extracted_images/ID_81DB2C366B01404F9A97BFB8829C3DA4.png',
-        'extracted_images/ID_02A2A16D3CF14ED89BFBA1888907D42D.png',
-    ],
     ('雄安华清智言科技有限公司', '大模型工具链平台'): [
         'extracted_images/ID_A168E61171474557A1AEEC59BB12A5BA.png',
     ],
@@ -59,26 +55,6 @@ PRODUCT_IMAGE_OVERRIDES = {
         'extracted_images/connsiteX2.png',
         'extracted_images/connsiteY2.png',
     ],
-    ('河北雄安英诺尔物联科技有限公司', 'XMINNOV 英诺尔RISC-V 架构 RFID 多模态数据采集终端'): [
-        'extracted_images/ID_18E67245104B4064A557BFC72CD04736.png',
-        'extracted_images/ID_85A2700C3D6E4357BA6F083A2E2176B4.png',
-    ],
-    ('北京翌特视讯科技有限公司', '无人机无线电监测压制一体设备'): [
-        'extracted_images/ID_D14E2F6B88E246FA9D214AA47AD38603.png',
-    ],
-    ('北京翌特视讯科技有限公司', 'ROV水下重点工程巡检机器人'): [
-        'extracted_images/ID_B08928AAD1CB4A33BEEC1A8F6847855A.png',
-    ],
-    ('北京翌特视讯科技有限公司', '楼宇清洗无人机'): [
-        'extracted_images/ID_3CC139D23F9C4073B4643272889EB8EA.png',
-    ],
-    ('北京翌特视讯科技有限公司', '北斗大脑低空安全监管平台V1.0'): [
-        'extracted_images/ID_C438933CC74E4242919BDE6D5C2FED62.png',
-        'extracted_images/ID_D00557E8BEB5497A929B00531835114D.png',
-    ],
-    ('北京翌特视讯科技有限公司', '翌特低空飞行器监测系统'): [
-        'extracted_images/ID_198AC6F4EEB242F4AE8804B9EB80F079.png',
-    ],
     ('芯昇科技有限公司', '摄像机'): [
         'extracted_images/xinsheng_camera.png',
     ],
@@ -99,6 +75,24 @@ PRODUCT_IMAGE_OVERRIDES = {
     ],
     ('雄安威赛博智能科技有限公司', '工业智算系列产品'): [
         'extracted_images/ID_0829407345CD4AADBD7E33463512A958.png',
+    ],
+    ('联通雄安产业互联网有限公司', '医疗信息集成平台'): [
+        'extracted_images/product_yiliao_jicheng.png',
+    ],
+    ('联通雄安产业互联网有限公司', '智慧标识应用'): [
+        'extracted_images/product_zhihui_biaoshi.png',
+    ],
+    ('联通雄安产业互联网有限公司', '数字员工'): [
+        'extracted_images/product_shuzi_yuangong.png',
+    ],
+    ('联通雄安产业互联网有限公司', 'MOM智能制造运营管理平台'): [
+        'extracted_images/product_mom.png',
+    ],
+    ('联通雄安产业互联网有限公司', 'Uni数转云'): [
+        'extracted_images/product_uni_shuzhuan.png',
+    ],
+    ('联通雄安产业互联网有限公司', '钢铁行业智能体'): [
+        'extracted_images/product_gangtie_agent.png',
     ],
 }
 
@@ -163,6 +157,67 @@ def find_images(row, cols):
     return [f'extracted_images/{img_id}.png' for img_id in unique]
 
 
+def normalize_product_name(name):
+    text = str(name).strip()
+    text = re.sub(r'[\s_\x0b]+', '', text)
+    for src, dst in [('\u201c', '"'), ('\u201d', '"'), ('\u2018', "'"), ('\u2019', "'")]:
+        text = text.replace(src, dst)
+    return text
+
+
+def format_phone(value):
+    text = str(value).strip()
+    if text.endswith('.0'):
+        text = text[:-2]
+    return text
+
+
+def is_valid_contact_value(value):
+    if pd.isna(value):
+        return False
+    text = str(value).strip()
+    return bool(text) and text.lower() != 'nan'
+
+
+def format_product_contact(manager, phone):
+    if not is_valid_contact_value(manager) or not is_valid_contact_value(phone):
+        return ''
+    return f'产品经理：{str(manager).strip()} 联系方式：{format_phone(phone)}'
+
+
+def sanitize_contact(text):
+    if not text:
+        return ''
+    text = str(text).strip()
+    if not text or re.search(r'\bnan\b', text, re.I):
+        return ''
+    return text
+
+
+def load_yangqi_contacts():
+    if not YANGQI_CONTACT_XLSX.exists():
+        return {}
+    df = pd.read_excel(YANGQI_CONTACT_XLSX, sheet_name=0, header=0)
+    df.columns = ['product', 'manager', 'phone']
+    contacts = {}
+    for _, row in df.iterrows():
+        if pd.isna(row['product']):
+            continue
+        product_name = str(row['product']).strip()
+        contact = format_product_contact(row['manager'], row['phone'])
+        if not contact:
+            continue
+        contacts[product_name] = contact
+        contacts[normalize_product_name(product_name)] = contact
+    return contacts
+
+
+def lookup_yangqi_contact(contacts, product_name):
+    return contacts.get(product_name) or contacts.get(normalize_product_name(product_name))
+
+
+yangqi_contacts = load_yangqi_contacts()
+
 company_map = {}
 
 for sheet in ['央企数科', '非央企数科']:
@@ -190,7 +245,11 @@ for sheet in ['央企数科', '非央企数科']:
                     'name': product_name,
                     'intro': str(intro).strip() if pd.notna(intro) else '',
                 }
-                contact = find_contact(row, cols)
+                contact = sanitize_contact(find_contact(row, cols))
+                if sheet == '央企数科':
+                    contact = sanitize_contact(
+                        lookup_yangqi_contact(yangqi_contacts, product_name) or contact
+                    )
                 images = find_images(row, cols)
                 override = PRODUCT_IMAGE_OVERRIDES.get((name, item['name']))
                 if override:
